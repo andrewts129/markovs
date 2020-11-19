@@ -12,7 +12,8 @@ object Main extends IOApp {
     }
 
     val model = Model[IO](input)
-    model.map(println(_)).compile.drain.as(ExitCode.Success)
+    val seed = Stream.emit("hello")
+    model.flatMap(_.generate(seed)).intersperse(" ").map(print(_)).compile.drain.as(ExitCode.Success)
   }
 
   private def inputPath: Path = Paths.get(getClass.getResource("test.txt").toURI)

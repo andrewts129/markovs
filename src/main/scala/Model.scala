@@ -1,7 +1,9 @@
-import Model.Weights
+import Model.{Weights, selectRandomWeighted}
 import fs2.{Pure, Stream}
 
+import scala.annotation.tailrec
 import scala.collection.immutable.HashMap
+import scala.util.Random
 
 object Model {
   type Weights = HashMap[String, HashMap[String, Int]]
@@ -29,9 +31,25 @@ object Model {
   }
 
   private def tokenize(string: String): Stream[Pure, String] = Stream.emits(string.split("\\s+"))
+
+  private def selectRandomWeighted(itemsWeighted: Map[String, Int], random: Random): String = {
+    val sortedByWeight = itemsWeighted.toVector.sortBy(_._2)
+
+    val items = sortedByWeight.map(_._1)
+    val weights = sortedByWeight.map(_._2)
+    val cumulativeWeights = weights.scanLeft(0)(_ + _).tail
+
+    val randomNumber = random.between(0.0, cumulativeWeights.last)
+    items.zip(cumulativeWeights).find { pair => randomNumber <= pair._2 }.get._1
+  }
 }
 
-class Model private(val weights: Weights) {
+class Model private(val weights: Weights, val seed: Option[Long] = None) {
+  private val random = seed match {
+    case Some(value) => new Random(value)
+    case None => new Random()
+  }
+
   def +(other: Model): Model = {
     val newWeights = weights.merged(other.weights) { case ((firstWord, thisSuccessors), (_, otherSuccessors)) =>
       firstWord -> thisSuccessors.merged(otherSuccessors) { case ((secondWord, thisCount), (_, otherCount)) =>
@@ -40,6 +58,24 @@ class Model private(val weights: Weights) {
     }
 
     new Model(newWeights)
+  }
+
+  @tailrec
+  final def generate(seed: Stream[Pure, String]): Stream[Pure, String] = {
+    next(seed) match {
+      case Stream.empty => seed
+      case nextToken => generate(seed ++ nextToken)
+    }
+  }
+
+  def next(tokens: Stream[Pure, String]): Stream[Pure, String] = {
+    tokens.last.toVector.head match {
+      case Some(lastToken) => weights.get(lastToken) match {
+        case Some(successors) => Stream.emit(selectRandomWeighted(successors, random))
+        case None => Stream.empty
+      }
+      case None => Stream.empty
+    }
   }
 
   override def toString: String = weights.toString
