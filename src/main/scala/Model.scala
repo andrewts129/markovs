@@ -1,7 +1,6 @@
 import Model.{Weights, selectRandomWeighted}
 import fs2.{Pure, Stream}
 
-import scala.annotation.tailrec
 import scala.collection.immutable.HashMap
 import scala.util.Random
 
@@ -60,20 +59,25 @@ class Model private(val weights: Weights, val seed: Option[Long] = None) {
     new Model(newWeights)
   }
 
-  @tailrec
-  final def generate(seed: Stream[Pure, String]): Stream[Pure, String] = {
-    next(seed) match {
-      case Stream.empty => seed
-      case nextToken => generate(seed ++ nextToken)
+  def generate(seed: Stream[Pure, String]): Stream[Pure, String] = {
+    seed ++ nextStreaming(seed)
+  }
+
+  private def next(tokens: Stream[Pure, String]): Option[String] = {
+    tokens.last.toVector.head match {
+      case Some(lastToken) => weights.get(lastToken) match {
+        case Some(successors) => Some(selectRandomWeighted(successors, random))
+        case None => None
+      }
+      case None => None
     }
   }
 
-  def next(tokens: Stream[Pure, String]): Stream[Pure, String] = {
-    tokens.last.toVector.head match {
-      case Some(lastToken) => weights.get(lastToken) match {
-        case Some(successors) => Stream.emit(selectRandomWeighted(successors, random))
-        case None => Stream.empty
-      }
+  private def nextStreaming(tokens: Stream[Pure, String]): Stream[Pure, String] = {
+    next(tokens) match {
+      case Some(nextToken) =>
+        val nextTokenStream = Stream.emit(nextToken)
+        nextTokenStream ++ nextStreaming(tokens ++ nextTokenStream)
       case None => Stream.empty
     }
   }
