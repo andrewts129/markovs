@@ -1,5 +1,5 @@
 import Schema.Weights
-import fs2.{Stream, Pure}
+import fs2.{Pure, Stream}
 
 import scala.collection.immutable.HashMap
 
@@ -35,5 +35,15 @@ class Schema private(val weights: Weights) {
     weights.get(tokens)
   }
 
-  override def toString: String = weights.toString
+  override def toString: String = {
+    val sortedWeights = weights.toVector.sortBy { case (ngram, _) => (-ngram.length, ngram.mkString) }
+    sortedWeights.map { case (ngram, successors) =>
+      val ngramString = ngram.mkString("(", ", ", "):")
+
+      val successorsSorted = successors.toVector.sortBy(_._2).reverse
+      val successorsStrings = successorsSorted.map { case (token, count) => s"\t$token => $count" }.toList
+
+      (ngramString :: successorsStrings).mkString("\n")
+    }.mkString("\n")
+  }
 }
