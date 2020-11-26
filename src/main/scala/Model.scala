@@ -1,28 +1,15 @@
-import Model.{Weights, selectRandomWeighted}
+import Model.selectRandomWeighted
 import fs2.{Pure, Stream}
 
-import scala.collection.immutable.HashMap
 import scala.util.Random
 
 object Model {
-  type Weights = HashMap[String, HashMap[String, Int]]
-
   def apply[F[_]](corpus: Stream[F, String]): Stream[F, Model] = {
     corpus.map(Model(_)).reduce(_ + _)
   }
 
   def apply(document: String): Model = {
-    val ngrams = asNGrams(tokenize(document))
-    val weights = ngrams.fold(
-      new Weights()
-    )((weights, ngram) => {
-      val successors = weights.getOrElse(ngram._1, new HashMap[String, Int]())
-      val count = successors.getOrElse(ngram._2, 0)
-      val newSuccessors = successors.updated(ngram._2, count + 1)
-      weights.updated(ngram._1, newSuccessors)
-    }).toVector.head
-
-    new Model(weights)
+    new Model(Schema(asNGrams(tokenize(document))))
   }
 
   private def asNGrams(tokens: Stream[Pure, String]): Stream[Pure, (String, String)] = {
@@ -43,20 +30,14 @@ object Model {
   }
 }
 
-class Model private(val weights: Weights, val seed: Option[Long] = None) {
+class Model private(val schema: Schema, val seed: Option[Long] = None) {
   private val random = seed match {
     case Some(value) => new Random(value)
     case None => new Random()
   }
 
   def +(other: Model): Model = {
-    val newWeights = weights.merged(other.weights) { case ((firstWord, thisSuccessors), (_, otherSuccessors)) =>
-      firstWord -> thisSuccessors.merged(otherSuccessors) { case ((secondWord, thisCount), (_, otherCount)) =>
-        secondWord -> (thisCount + otherCount)
-      }
-    }
-
-    new Model(newWeights)
+    new Model(this.schema + other.schema, seed)
   }
 
   def generate(seed: Stream[Pure, String]): Stream[Pure, String] = {
@@ -65,7 +46,7 @@ class Model private(val weights: Weights, val seed: Option[Long] = None) {
 
   private def next(tokens: Stream[Pure, String]): Option[String] = {
     tokens.last.toVector.head match {
-      case Some(lastToken) => weights.get(lastToken) match {
+      case Some(lastToken) => schema.successorsOf(lastToken) match {
         case Some(successors) => Some(selectRandomWeighted(successors, random))
         case None => None
       }
@@ -76,11 +57,11 @@ class Model private(val weights: Weights, val seed: Option[Long] = None) {
   private def nextStreaming(tokens: Stream[Pure, String]): Stream[Pure, String] = {
     next(tokens) match {
       case Some(nextToken) =>
-        val nextTokenStream = Stream.emit(nextToken)
-        nextTokenStream ++ nextStreaming(tokens ++ nextTokenStream)
+        val nextTokenAsStream = Stream.emit(nextToken)
+        nextTokenAsStream ++ nextStreaming(tokens ++ nextTokenAsStream)
       case None => Stream.empty
     }
   }
 
-  override def toString: String = weights.toString
+  override def toString: String = schema.toString
 }
