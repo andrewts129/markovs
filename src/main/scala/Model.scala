@@ -1,5 +1,6 @@
 import Model.selectRandomWeighted
 import fs2.{Pure, Stream}
+import opennlp.tools.tokenize.SimpleTokenizer
 
 import scala.util.Random
 
@@ -18,7 +19,9 @@ object Model {
     tokens.sliding(n).map(_.toVector)
   }
 
-  private def tokenize(string: String): Stream[Pure, String] = Stream.emits(string.split("\\s+"))
+  private def tokenize(string: String): Stream[Pure, String] = {
+    Stream.emits(SimpleTokenizer.INSTANCE.tokenize(string))
+  }
 
   private def selectRandomWeighted(itemsWeighted: Map[String, Int], random: Random): String = {
     val sortedByWeight = itemsWeighted.toVector.sortBy(_._2)
