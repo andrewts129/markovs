@@ -4,16 +4,17 @@ import fs2.{Pure, Stream}
 import scala.util.Random
 
 object Model {
-  def apply[F[_]](corpus: Stream[F, String]): Stream[F, Model] = {
-    corpus.map(Model(_)).reduce(_ + _)
+  def apply[F[_]](corpus: Stream[F, String], n: Int): Stream[F, Model] = {
+    corpus.map(Model(_, n)).reduce(_ + _)
   }
 
-  def apply(document: String): Model = {
-    new Model(Schema(asNGrams(tokenize(document))))
+  def apply(document: String, n: Int): Model = {
+    val schema = Schema(asNGrams(tokenize(document), n + 1))
+    new Model(schema, n)
   }
 
-  private def asNGrams(tokens: Stream[Pure, String]): Stream[Pure, (String, String)] = {
-    tokens.zipWithNext.collect { case (first, Some(second)) => (first, second) }
+  private def asNGrams(tokens: Stream[Pure, String], n: Int): Stream[Pure, Vector[String]] = {
+    tokens.sliding(n).map(_.toVector)
   }
 
   private def tokenize(string: String): Stream[Pure, String] = Stream.emits(string.split("\\s+"))
@@ -30,14 +31,14 @@ object Model {
   }
 }
 
-class Model private(val schema: Schema, val seed: Option[Long] = None) {
-  private val random = seed match {
+class Model private(val schema: Schema, val n: Int, val randomSeed: Option[Long] = None) {
+  private val random = randomSeed match {
     case Some(value) => new Random(value)
     case None => new Random()
   }
 
   def +(other: Model): Model = {
-    new Model(this.schema + other.schema, seed)
+    new Model(this.schema + other.schema, math.max(this.n, other.n), randomSeed)
   }
 
   def generate(seed: Stream[Pure, String]): Stream[Pure, String] = {
@@ -45,12 +46,12 @@ class Model private(val schema: Schema, val seed: Option[Long] = None) {
   }
 
   private def next(tokens: Stream[Pure, String]): Option[String] = {
-    tokens.last.toVector.head match {
-      case Some(lastToken) => schema.successorsOf(lastToken) match {
+    tokens.takeRight(this.n).toVector match {
+      case Vector() => None
+      case lastTokens => schema.successorsOf(lastTokens) match {
         case Some(successors) => Some(selectRandomWeighted(successors, random))
         case None => None
       }
-      case None => None
     }
   }
 
