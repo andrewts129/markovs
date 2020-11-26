@@ -9,8 +9,9 @@ object Model {
   }
 
   def apply(document: String, n: Int): Model = {
-    val schema = Schema(asNGrams(tokenize(document), n + 1))
-    new Model(schema, n)
+    val tokens = tokenize(document)
+    val nGrams = Stream.range(2, n + 2).flatMap(asNGrams(tokens, _))
+    new Model(Schema(nGrams), n)
   }
 
   private def asNGrams(tokens: Stream[Pure, String], n: Int): Stream[Pure, Vector[String]] = {
@@ -46,7 +47,15 @@ class Model private(val schema: Schema, val n: Int, val randomSeed: Option[Long]
   }
 
   private def next(tokens: Stream[Pure, String]): Option[String] = {
-    tokens.takeRight(this.n).toVector match {
+    val possibleNextTokens = Stream.range(this.n, 0 , -1).map(n => nextWithN(tokens, n)).unNone
+    possibleNextTokens.head.toVector match {
+      case nextToken +: _ => Some(nextToken)
+      case Vector() => None
+    }
+  }
+
+  private def nextWithN(tokens: Stream[Pure, String], n: Int): Option[String] = {
+    tokens.takeRight(n).toVector match {
       case Vector() => None
       case lastTokens => schema.successorsOf(lastTokens) match {
         case Some(successors) => Some(selectRandomWeighted(successors, random))

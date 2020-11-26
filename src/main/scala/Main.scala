@@ -11,7 +11,7 @@ object Main extends IOApp {
         .through(text.lines)
     }
 
-    val model = Model[IO](input, 1)
+    val model = Model[IO](input, 2)
     val seed = Stream.emit("hello")
     model.flatMap(_.generate(seed)).intersperse(" ").map(print(_)).compile.drain.as(ExitCode.Success)
   }
