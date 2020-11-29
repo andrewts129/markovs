@@ -4,13 +4,13 @@ import fs2.{Pure, Stream}
 import scala.collection.immutable.HashMap
 
 object Schema {
-  type Weights = HashMap[Vector[String], HashMap[String, Int]]
+  type Weights[S] = HashMap[Vector[S], HashMap[S, Int]]
 
-  def apply(ngrams: Stream[Pure, Vector[String]]): Schema = {
+  def apply[S](ngrams: Stream[Pure, Vector[S]]): Schema[S] = {
     val weights = ngrams.fold(
-      new Weights()
+      new Weights[S]()
     )((weights, ngram) => {
-      val successors = weights.getOrElse(ngram.init, new HashMap[String, Int]())
+      val successors = weights.getOrElse(ngram.init, new HashMap[S, Int]())
       val count = successors.getOrElse(ngram.last, 0)
       val newSuccessors = successors.updated(ngram.last, count + 1)
       weights.updated(ngram.init, newSuccessors)
@@ -20,8 +20,8 @@ object Schema {
   }
 }
 
-class Schema private(val weights: Weights) {
-  def +(other: Schema): Schema = {
+class Schema[S] private(val weights: Weights[S]) {
+  def +(other: Schema[S]): Schema[S] = {
     val newWeights = weights.merged(other.weights) { case ((firstWord, thisSuccessors), (_, otherSuccessors)) =>
       firstWord -> thisSuccessors.merged(otherSuccessors) { case ((secondWord, thisCount), (_, otherCount)) =>
         secondWord -> (thisCount + otherCount)
@@ -31,7 +31,7 @@ class Schema private(val weights: Weights) {
     new Schema(newWeights)
   }
 
-  def successorsOf(tokens: Vector[String]): Option[HashMap[String, Int]] = {
+  def successorsOf(tokens: Vector[S]): Option[HashMap[S, Int]] = {
     weights.get(tokens)
   }
 

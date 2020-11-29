@@ -5,11 +5,11 @@ import opennlp.tools.tokenize.SimpleTokenizer
 import scala.util.Random
 
 object Model {
-  def apply[F[_]](corpus: Stream[F, String], n: Int): Stream[F, Model] = {
+  def apply[F[_]](corpus: Stream[F, String], n: Int): Stream[F, Model[String]] = {
     corpus.map(Model(_, n)).reduce(_ + _)
   }
 
-  def apply(document: String, n: Int): Model = {
+  def apply(document: String, n: Int): Model[String] = {
     val tokens = tokenize(document)
     val nGrams = Stream.range(2, n + 2).flatMap(asNGrams(tokens, _))
     new Model(Schema(nGrams), n)
@@ -23,7 +23,7 @@ object Model {
     Stream.emits(SimpleTokenizer.INSTANCE.tokenize(string))
   }
 
-  private def selectRandomWeighted(itemsWeighted: Map[String, Int], random: Random): String = {
+  private def selectRandomWeighted[S](itemsWeighted: Map[S, Int], random: Random): S = {
     val sortedByWeight = itemsWeighted.toVector.sortBy(_._2)
 
     val items = sortedByWeight.map(_._1)
@@ -35,21 +35,21 @@ object Model {
   }
 }
 
-class Model private(val schema: Schema, val n: Int, val randomSeed: Option[Long] = None) {
+class Model[S] private(val schema: Schema[S], val n: Int, val randomSeed: Option[Long] = None) {
   private val random = randomSeed match {
     case Some(value) => new Random(value)
     case None => new Random()
   }
 
-  def +(other: Model): Model = {
+  def +(other: Model[S]): Model[S] = {
     new Model(this.schema + other.schema, math.max(this.n, other.n), randomSeed)
   }
 
-  def generate(seed: Stream[Pure, String]): Stream[Pure, String] = {
+  def generate(seed: Stream[Pure, S]): Stream[Pure, S] = {
     seed ++ nextStreaming(seed)
   }
 
-  private def next(tokens: Stream[Pure, String]): Option[String] = {
+  private def next(tokens: Stream[Pure, S]): Option[S] = {
     val possibleNextTokens = Stream.range(this.n, 0 , -1).map(n => nextWithN(tokens, n)).unNone
     possibleNextTokens.head.toVector match {
       case nextToken +: _ => Some(nextToken)
@@ -57,7 +57,7 @@ class Model private(val schema: Schema, val n: Int, val randomSeed: Option[Long]
     }
   }
 
-  private def nextWithN(tokens: Stream[Pure, String], n: Int): Option[String] = {
+  private def nextWithN(tokens: Stream[Pure, S], n: Int): Option[S] = {
     tokens.takeRight(n).toVector match {
       case Vector() => None
       case lastTokens => schema.successorsOf(lastTokens) match {
@@ -67,7 +67,7 @@ class Model private(val schema: Schema, val n: Int, val randomSeed: Option[Long]
     }
   }
 
-  private def nextStreaming(tokens: Stream[Pure, String]): Stream[Pure, String] = {
+  private def nextStreaming(tokens: Stream[Pure, S]): Stream[Pure, S] = {
     next(tokens) match {
       case Some(nextToken) =>
         val nextTokenAsStream = Stream.emit(nextToken)
