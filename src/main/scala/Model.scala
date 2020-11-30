@@ -5,6 +5,8 @@ import opennlp.tools.tokenize.SimpleTokenizer
 import scala.util.Random
 
 object Model {
+  private lazy val tokenizer = SimpleTokenizer.INSTANCE
+
   def apply[F[_]](corpus: Stream[F, String], n: Int): Stream[F, Model[String]] = {
     corpus.map(Model(_, n)).reduce(_ + _)
   }
@@ -20,7 +22,7 @@ object Model {
   }
 
   private def tokenize(string: String): Stream[Pure, String] = {
-    Stream.emits(SimpleTokenizer.INSTANCE.tokenize(string))
+    Stream.emits(tokenizer.tokenize(string))
   }
 
   private def selectRandomWeighted[S](itemsWeighted: Map[S, Int], random: Random): S = {
