@@ -1,12 +1,10 @@
 import Model.selectRandomWeighted
+import PreProcessing.{asNGrams, tokenize}
 import fs2.{Pure, Stream}
-import opennlp.tools.tokenize.SimpleTokenizer
 
 import scala.util.Random
 
 object Model {
-  private lazy val tokenizer = SimpleTokenizer.INSTANCE
-
   def apply[F[_]](corpus: Stream[F, String], n: Int): Stream[F, Model[String]] = {
     corpus.map(Model(_, n)).reduce(_ + _)
   }
@@ -15,14 +13,6 @@ object Model {
     val tokens = tokenize(document)
     val nGrams = Stream.range(2, n + 2).flatMap(asNGrams(tokens, _))
     new Model(Schema(nGrams), n)
-  }
-
-  private def asNGrams(tokens: Stream[Pure, String], n: Int): Stream[Pure, Vector[String]] = {
-    tokens.sliding(n).map(_.toVector)
-  }
-
-  private def tokenize(string: String): Stream[Pure, String] = {
-    Stream.emits(tokenizer.tokenize(string))
   }
 
   private def selectRandomWeighted[S](itemsWeighted: Map[S, Int], random: Random): S = {
