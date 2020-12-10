@@ -1,18 +1,17 @@
 import Model.selectRandomWeighted
-import PreProcessing.{asNGrams, tokenize}
+import PreProcessing.{PosToken, all}
 import fs2.{Pure, Stream}
 
 import scala.util.Random
 
 object Model {
-  def apply[F[_]](corpus: Stream[F, String], n: Int): Stream[F, Model[String]] = {
+  def apply[F[_]](corpus: Stream[F, String], n: Int): Stream[F, Model[PosToken]] = {
     corpus.map(Model(_, n)).reduce(_ + _)
   }
 
-  def apply(document: String, n: Int): Model[String] = {
-    val tokens = tokenize(document)
-    val nGrams = Stream.range(2, n + 2).flatMap(asNGrams(tokens, _))
-    new Model(Schema(nGrams), n)
+  def apply(document: String, n: Int): Model[PosToken] = {
+    val processedTokens = PreProcessing.all(document, 2, n + 2)
+    new Model(Schema(processedTokens), n)
   }
 
   private def selectRandomWeighted[S](itemsWeighted: Map[S, Int], random: Random): S = {

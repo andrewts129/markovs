@@ -2,3 +2,4 @@
 .bsp/
 .idea/
 src/main/resources/*.txt
+*.bin
