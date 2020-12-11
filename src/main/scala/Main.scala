@@ -1,6 +1,5 @@
 import java.nio.file.{Path, Paths}
-
-import PreProcessing.{posTag, tokenize}
+import PreProcessing.{detokenize, posTag, tokenize}
 import cats.effect.{Blocker, ExitCode, IO, IOApp}
 import fs2.{Stream, io, text}
 
@@ -14,7 +13,9 @@ object Main extends IOApp {
 
     val model = Model[IO](input, 1)
     val seed = posTag(tokenize("hello"))
-    model.flatMap(_.generate(seed).map(_.toString)).intersperse(" ").map(print(_)).compile.drain.as(ExitCode.Success)
+    val generatedTokens = model.flatMap(_.generate(seed))
+
+    generatedTokens.through(detokenize).intersperse(" ").map(print(_)).compile.drain.as(ExitCode.Success)
   }
 
   private def inputPath: Path = Paths.get(getClass.getResource("test.txt").toURI)

@@ -1,3 +1,4 @@
+import cats.effect.IO
 import fs2.{Pure, Stream}
 import opennlp.tools.postag.{POSModel, POSTaggerME}
 import opennlp.tools.tokenize.SimpleTokenizer
@@ -26,6 +27,14 @@ object PreProcessing {
 
   def tokenize(string: String): Stream[Pure, String] = {
     Stream.emits(tokenizer.tokenize(string))
+  }
+
+  def detokenize(tokens: Vector[String]): String = {
+    tokens.mkString(" ")
+  }
+
+  def detokenize(posTokens: Stream[IO, PosToken]): Stream[IO, String] = {
+    posTokens.map(_.token).chunkN(30).map(chunk => detokenize(chunk.toVector))
   }
 
   def posTag(tokens: Stream[Pure, String]): Stream[Pure, PosToken] = {
