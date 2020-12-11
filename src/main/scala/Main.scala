@@ -13,12 +13,12 @@ object Main extends IOApp {
         .through(text.lines)
     }
 
-    val model = Model[IO](input, 1)
-    val seed = posTag(tokenize("hello"))
+    val model = Model[IO](input.take(2000), 2)
+    val seed = posTag(tokenize("And"))
     val generatedTokens = model.flatMap(_.generate(seed))
 
-    generatedTokens.through(detokenize).intersperse(" ").map(print(_)).compile.drain.as(ExitCode.Success)
+    generatedTokens.through(detokenize).intersperse("|").map(print(_)).compile.drain.as(ExitCode.Success)
   }
 
-  private def inputPath: Path = Paths.get(getClass.getResource("test.txt").toURI)
+  private def inputPath: Path = Paths.get(getClass.getResource("nyt.txt").toURI)
 }
