@@ -1,5 +1,7 @@
+import PostProcessing.detokenize
+
 import java.nio.file.{Path, Paths}
-import PreProcessing.{detokenize, posTag, tokenize}
+import PreProcessing.{posTag, tokenize}
 import cats.effect.{Blocker, ExitCode, IO, IOApp}
 import fs2.{Stream, io, text}
 
