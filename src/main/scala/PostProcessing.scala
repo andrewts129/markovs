@@ -6,7 +6,7 @@ import opennlp.tools.tokenize.{DetokenizationDictionary, DictionaryDetokenizer}
 
 object PostProcessing {
   private val NO_SPACE_BEFORE = Array(".", ",", "!", "?", ";", ":", "%", ")", "]", "}", "”")
-  private val NO_SPACE_AFTER = Array("(", "[", "{", "$", "“", "#")
+  private val NO_SPACE_AFTER = Array("(", "[", "{", "$", "“", "#", "@")
   private val NO_SPACE_EITHER = Array("-", "_", "’")
   private val ALTERNATING = Array("\"", "'")
 
