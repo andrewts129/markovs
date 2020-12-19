@@ -1,6 +1,7 @@
 import PreProcessing.PosToken
 import cats.effect.IO
-import fs2.Stream
+import fs2.{Chunk, Stream}
+import cats.implicits._
 import opennlp.tools.tokenize.DetokenizationDictionary.Operation
 import opennlp.tools.tokenize.{DetokenizationDictionary, DictionaryDetokenizer}
 
@@ -30,7 +31,21 @@ object PostProcessing {
   }
 
   def detokenize(posTokens: Stream[IO, PosToken]): Stream[IO, String] = {
-    // TODO chunk by sentences
-    posTokens.map(_.token).chunkN(30).map(chunk => detokenize(chunk.toVector))
+    sentences(posTokens).map(sentence => {
+      val tokens = sentence.map(_.token)
+      detokenize(tokens.toVector)
+    })
+  }
+
+  private def sentences(posTokens: Stream[IO, PosToken]): Stream[IO, Chunk[PosToken]] = {
+    val groups = posTokens.groupAdjacentBy(_.pos != ".")
+
+    groups.zipWithNext.map {
+      case ((_, firstChunk), maybeSecond) => maybeSecond match {
+        case Some((isSecondSentence, secondChunk)) =>
+          if (isSecondSentence) None else Some(Chunk.concat(Seq(firstChunk, secondChunk)))
+        case None => Some(firstChunk)
+      }
+    }.unNone
   }
 }

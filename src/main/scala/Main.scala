@@ -15,7 +15,7 @@ object Main extends IOApp {
     val model = Model[IO](input.take(2000), 2)
     val generatedTokens = model.flatMap(_.generate)
 
-    generatedTokens.through(detokenize).intersperse("|").map(print(_)).compile.drain.as(ExitCode.Success)
+    generatedTokens.through(detokenize).intersperse(" ").map(print(_)).compile.drain.as(ExitCode.Success)
   }
 
   private def inputPath: Path = Paths.get(getClass.getResource("nyt.txt").toURI)
