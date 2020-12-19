@@ -1,7 +1,6 @@
 import PostProcessing.detokenize
 
 import java.nio.file.{Path, Paths}
-import PreProcessing.{posTag, tokenize}
 import cats.effect.{Blocker, ExitCode, IO, IOApp}
 import fs2.{Stream, io, text}
 
@@ -14,8 +13,7 @@ object Main extends IOApp {
     }
 
     val model = Model[IO](input.take(2000), 2)
-    val seed = posTag(tokenize("And"))
-    val generatedTokens = model.flatMap(_.generate(seed))
+    val generatedTokens = model.flatMap(_.generate)
 
     generatedTokens.through(detokenize).intersperse("|").map(print(_)).compile.drain.as(ExitCode.Success)
   }

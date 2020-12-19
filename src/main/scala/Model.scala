@@ -36,6 +36,13 @@ class Model[S] private(val schema: Schema[S], val n: Int, val randomSeed: Option
     new Model(this.schema + other.schema, math.max(this.n, other.n), randomSeed)
   }
 
+  def generate: Stream[Pure, S] = {
+    schema.getSeed(random) match {
+      case Some(seed) => generate(Stream.emit(seed))
+      case None => Stream.empty
+    }
+  }
+
   def generate(seed: Stream[Pure, S]): Stream[Pure, S] = {
     seed ++ nextStreaming(seed)
   }
