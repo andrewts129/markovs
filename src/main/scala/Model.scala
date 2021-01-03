@@ -1,6 +1,7 @@
 import Model.selectRandomWeighted
 import PreProcessing.PosToken
 import fs2.{Pure, Stream}
+import schema.{DictSchema, Schema}
 
 import scala.util.Random
 
@@ -11,7 +12,7 @@ object Model {
 
   def apply(document: String, n: Int): Model[PosToken] = {
     val processedTokens = PreProcessing.all(document, 2, n + 2)
-    new Model(Schema(processedTokens), n)
+    new Model(DictSchema(processedTokens), n)
   }
 
   private def selectRandomWeighted[S](itemsWeighted: Map[S, Int], random: Random): S = {

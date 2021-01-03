@@ -1,14 +1,16 @@
-import Schema.Weights
+package schema
+
 import fs2.{Pure, Stream}
+import schema.DictSchema.Weights
 
 import scala.collection.immutable.HashMap
 import scala.util.Random
 
 
-object Schema {
+object DictSchema {
   type Weights[S] = HashMap[Vector[S], HashMap[S, Int]]
 
-  def apply[S](ngrams: Stream[Pure, Vector[S]]): Schema[S] = {
+  def apply[S](ngrams: Stream[Pure, Vector[S]]): DictSchema[S] = {
     val weights = ngrams.fold(
       new Weights[S]()
     )((weights, ngram) => {
@@ -23,31 +25,35 @@ object Schema {
       case _ => Vector(ngrams.head.toVector.head.head)
     }
 
-    new Schema(weights, seeds)
+    new DictSchema(weights, seeds)
   }
 }
 
-class Schema[S] private(val weights: Weights[S], val seeds: Seq[S]) {
-  def +(other: Schema[S]): Schema[S] = {
-    val newWeights = weights.merged(other.weights) { case ((firstWord, thisSuccessors), (_, otherSuccessors)) =>
+class DictSchema[S] private(val weights: Weights[S], val seeds: Seq[S]) extends Schema[S] {
+  def +(other: Schema[S]): DictSchema[S] = {
+    val otherAsDict = other.toDictSchema
+
+    val newWeights = weights.merged(otherAsDict.weights) { case ((firstWord, thisSuccessors), (_, otherSuccessors)) =>
       firstWord -> thisSuccessors.merged(otherSuccessors) { case ((secondWord, thisCount), (_, otherCount)) =>
         secondWord -> (thisCount + otherCount)
       }
     }
 
-    new Schema(newWeights, seeds ++ other.seeds)
+    new DictSchema(newWeights, seeds ++ otherAsDict.seeds)
   }
 
-  def successorsOf(tokens: Vector[S]): Option[HashMap[S, Int]] = {
+  override def successorsOf(tokens: Vector[S]): Option[HashMap[S, Int]] = {
     weights.get(tokens)
   }
 
-  def getSeed(random: Random): Option[S] = {
+  override def getSeed(random: Random): Option[S] = {
     seeds.size match {
       case 0 => None
       case n => Some(seeds(random.nextInt(n)))
     }
   }
+
+  override def toDictSchema: DictSchema[S] = this
 
   override def toString: String = {
     val sortedWeights = weights.toVector.sortBy { case (ngram, _) => (-ngram.length, ngram.mkString) }
