@@ -55,6 +55,8 @@ class DictSchema[S] private(val weights: Weights[S], val seeds: Seq[S]) extends 
 
   override def toDictSchema: DictSchema[S] = this
 
+  override def toFileSchema: FileSchema[S] = ???
+
   override def toString: String = {
     val sortedWeights = weights.toVector.sortBy { case (ngram, _) => (-ngram.length, ngram.mkString) }
     sortedWeights.map { case (ngram, successors) =>

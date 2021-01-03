@@ -11,4 +11,6 @@ trait Schema[S] {
   def getSeed(random: Random): Option[S]
 
   def toDictSchema: DictSchema[S]
+
+  def toFileSchema: FileSchema[S]
 }
