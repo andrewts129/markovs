@@ -24,6 +24,7 @@ object FileSchema {
 
     createTables(transactor).unsafeRunSync()
     addSeeds(transactor, dictSchema.seeds).unsafeRunSync()
+    addWeights(transactor, dictSchema.weights).unsafeRunSync()
 
     new FileSchema[S](transactor)
   }
@@ -65,6 +66,24 @@ object FileSchema {
     )
 
     inserts.toList.sequence.transact(transactor)
+  }
+
+  private def addWeights[S](transactor: Aux[IO, Unit], weights: HashMap[Vector[S], HashMap[S, Int]]): IO[List[Long]] = {
+    val inserts = weights.map { case (ngram, successors) =>
+      for {
+        _ <- sql"INSERT INTO ngrams (ngram) VALUES (${ngram.toString()})".update.run
+        id <- sql"SELECT last_insert_rowid()".query[Long].unique
+        _ <- successorInserts(id, successors)
+      } yield id
+    }
+
+    inserts.toList.sequence.transact(transactor)
+  }
+
+  private def successorInserts[S](ngramId: Long, successors: HashMap[S, Int]): doobie.ConnectionIO[List[Int]] = {
+    successors.map { case (successor, count) =>
+      sql"INSERT INTO successors (ngram_id, successor, count) VALUES ($ngramId, ${successor.toString}, $count)".update.run
+    }.toList.sequence
   }
 }
 
