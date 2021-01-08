@@ -23,6 +23,7 @@ object FileSchema {
     )
 
     createTables(transactor).unsafeRunSync()
+    addSeeds(transactor, dictSchema.seeds).unsafeRunSync()
 
     new FileSchema[S](transactor)
   }
@@ -56,6 +57,14 @@ object FileSchema {
     )
 
     queries.traverse(_.update.run).transact(transactor)
+  }
+
+  private def addSeeds[S](transactor: Aux[IO, Unit], seeds: Seq[S]): IO[List[Int]] = {
+    val inserts = seeds.map(seed =>
+      sql"INSERT INTO seeds (seed) VALUES (${seed.toString})".update.run
+    )
+
+    inserts.toList.sequence.transact(transactor)
   }
 }
 

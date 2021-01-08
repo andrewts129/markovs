@@ -4,7 +4,7 @@ import opennlp.tools.tokenize.SimpleTokenizer
 
 object PreProcessing {
   case class PosToken(token: String, pos: String) {
-    override def toString: String = token
+    override def toString: String = token + "\t" + pos
   }
 
   private lazy val tokenizer = SimpleTokenizer.INSTANCE
