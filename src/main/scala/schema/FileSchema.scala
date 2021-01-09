@@ -99,7 +99,30 @@ class FileSchema[S : StringSerializable] private(transactor: Aux[IO, Unit]) exte
     (this.toDictSchema + other.toDictSchema).toFileSchema
   }
 
-  override def successorsOf(tokens: Vector[S]): Option[HashMap[S, Int]] = ???
+  override def successorsOf(tokens: Vector[S]): Option[HashMap[S, Int]] = {
+    val query =
+      sql"""
+        SELECT s.successor, s.count
+        FROM successors s
+        JOIN ngrams n ON n.id = s.ngram_id
+        WHERE n.ngram = ${tokens.serialize}
+      """.query[(String, Int)]
+
+    val mappings = query.stream.map { case (successorString, count) =>
+      (successorString.deserialize[S], count)
+    }.fold(
+      new HashMap[S, Int]()
+    )((accumulatedSuccessors, row) => {
+      val (successor, count) = row
+      accumulatedSuccessors.updated(successor, count)
+    })
+
+    val result = mappings.transact(transactor).compile.toList.map(_.head).unsafeRunSync()
+    result.size match {
+      case 0 => None
+      case _ => Some(result)
+    }
+  }
 
   override def getSeed(random: Random): Option[S] = {
     val query = for {
