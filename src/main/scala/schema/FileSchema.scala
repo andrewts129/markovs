@@ -5,6 +5,7 @@ import cats.implicits._
 import doobie.util.transactor.Transactor
 import doobie.util.transactor.Transactor.Aux
 import doobie.implicits._
+import schema.StringSerializable.syntax._
 
 import scala.collection.immutable.HashMap
 import scala.concurrent.ExecutionContext
@@ -17,7 +18,7 @@ object FileSchema {
 
   implicit val cs: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
 
-  def apply[S](filePath: String, dictSchema: DictSchema[S]): FileSchema[S] = {
+  def apply[S : StringSerializable](filePath: String, dictSchema: DictSchema[S]): FileSchema[S] = {
     val transactor = Transactor.fromDriverManager[IO](
       "org.sqlite.JDBC", s"jdbc:sqlite:$filePath"
     )
@@ -60,18 +61,18 @@ object FileSchema {
     queries.traverse(_.update.run).transact(transactor)
   }
 
-  private def addSeeds[S](transactor: Aux[IO, Unit], seeds: Seq[S]): IO[List[Int]] = {
+  private def addSeeds[S : StringSerializable](transactor: Aux[IO, Unit], seeds: Seq[S]): IO[List[Int]] = {
     val inserts = seeds.map(seed =>
-      sql"INSERT INTO seeds (seed) VALUES (${seed.toString})".update.run
+      sql"INSERT INTO seeds (seed) VALUES (${seed.serialize})".update.run
     )
 
     inserts.toList.sequence.transact(transactor)
   }
 
-  private def addWeights[S](transactor: Aux[IO, Unit], weights: HashMap[Vector[S], HashMap[S, Int]]): IO[List[Long]] = {
+  private def addWeights[S : StringSerializable](transactor: Aux[IO, Unit], weights: HashMap[Vector[S], HashMap[S, Int]]): IO[List[Long]] = {
     val inserts = weights.map { case (ngram, successors) =>
       for {
-        _ <- sql"INSERT INTO ngrams (ngram) VALUES (${ngram.toString()})".update.run
+        _ <- sql"INSERT INTO ngrams (ngram) VALUES (${ngram.serialize})".update.run
         id <- sql"SELECT last_insert_rowid()".query[Long].unique
         _ <- successorInserts(id, successors)
       } yield id
@@ -80,14 +81,14 @@ object FileSchema {
     inserts.toList.sequence.transact(transactor)
   }
 
-  private def successorInserts[S](ngramId: Long, successors: HashMap[S, Int]): doobie.ConnectionIO[List[Int]] = {
+  private def successorInserts[S : StringSerializable](ngramId: Long, successors: HashMap[S, Int]): doobie.ConnectionIO[List[Int]] = {
     successors.map { case (successor, count) =>
-      sql"INSERT INTO successors (ngram_id, successor, count) VALUES ($ngramId, ${successor.toString}, $count)".update.run
+      sql"INSERT INTO successors (ngram_id, successor, count) VALUES ($ngramId, ${successor.serialize}, $count)".update.run
     }.toList.sequence
   }
 }
 
-class FileSchema[S] private(transactor: Aux[IO, Unit]) extends Schema[S] {
+class FileSchema[S : StringSerializable] private(transactor: Aux[IO, Unit]) extends Schema[S] {
   override def +(other: Schema[S]): Schema[S] = ???
 
   override def successorsOf(tokens: Vector[S]): Option[HashMap[S, Int]] = ???

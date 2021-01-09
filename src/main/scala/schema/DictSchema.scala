@@ -10,7 +10,7 @@ import scala.util.Random
 object DictSchema {
   type Weights[S] = HashMap[Vector[S], HashMap[S, Int]]
 
-  def apply[S](ngrams: Stream[Pure, Vector[S]]): DictSchema[S] = {
+  def apply[S : StringSerializable](ngrams: Stream[Pure, Vector[S]]): DictSchema[S] = {
     val weights = ngrams.fold(
       new Weights[S]()
     )((weights, ngram) => {
@@ -29,7 +29,7 @@ object DictSchema {
   }
 }
 
-class DictSchema[S] private(val weights: Weights[S], val seeds: Seq[S]) extends Schema[S] {
+class DictSchema[S : StringSerializable] private(val weights: Weights[S], val seeds: Seq[S]) extends Schema[S] {
   def +(other: Schema[S]): DictSchema[S] = {
     val otherAsDict = other.toDictSchema
 
