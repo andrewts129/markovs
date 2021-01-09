@@ -7,11 +7,11 @@ import schema.{DictSchema, Schema}
 import scala.util.Random
 
 object Model {
-  def apply[F[_]](corpus: Stream[F, String], n: Int): Stream[F, Model[PosToken]] = {
+  def apply[F[_]](corpus: Stream[F, String], n: Int): Stream[F, Model[PosToken, DictSchema]] = {
     corpus.map(Model(_, n)).reduce(_ + _)
   }
 
-  def apply(document: String, n: Int): Model[PosToken] = {
+  def apply(document: String, n: Int): Model[PosToken, DictSchema] = {
     val processedTokens = PreProcessing.all(document, 2, n + 2)
     new Model(DictSchema(processedTokens), n)
   }
@@ -28,14 +28,14 @@ object Model {
   }
 }
 
-class Model[S] private(val schema: Schema[S], val n: Int, val randomSeed: Option[Long] = None) {
+class Model[S, T[_] <: Schema[_]] private(val schema: Schema[S], val n: Int, val randomSeed: Option[Long] = None) {
   private val random = randomSeed match {
     case Some(value) => new Random(value)
     case None => new Random()
   }
 
-  def +(other: Model[S]): Model[S] = {
-    new Model(this.schema + other.schema, math.max(this.n, other.n), randomSeed)
+  def +(other: Model[S, T]): Model[S, T] = {
+    new Model[S, T](this.schema + other.schema, math.max(this.n, other.n), randomSeed)
   }
 
   def generate: Stream[Pure, S] = {
