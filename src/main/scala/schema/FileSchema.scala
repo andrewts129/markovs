@@ -1,7 +1,9 @@
 package schema
 
 import cats.effect.{ContextShift, IO}
+import cats.free.Free
 import cats.implicits._
+import doobie.free.connection
 import doobie.util.transactor.Transactor
 import doobie.util.transactor.Transactor.Aux
 import doobie.implicits._
@@ -12,6 +14,7 @@ import scala.collection.immutable.HashMap
 import scala.concurrent.ExecutionContext
 import scala.util.Random
 
+// TODO get rid of all the unsafeRunSync
 object FileSchema {
   case class Seed(id: Long, seed: String)
   case class Ngram(id: Long, ngram: String)
@@ -24,7 +27,6 @@ object FileSchema {
       "org.sqlite.JDBC", s"jdbc:sqlite:$filePath"
     )
 
-    // TODO can I do this without unsafeRunSync?
     createTables(transactor).unsafeRunSync()
     addSeeds(transactor, dictSchema.seeds).unsafeRunSync()
     addWeights(transactor, dictSchema.weights).unsafeRunSync()
@@ -98,10 +100,19 @@ class FileSchema[S : StringSerializable] private(transactor: Aux[IO, Unit]) exte
 
   override def successorsOf(tokens: Vector[S]): Option[HashMap[S, Int]] = ???
 
-  override def getSeed(random: Random): Option[S] = ???
+  override def getSeed(random: Random): Option[S] = {
+    val query = for {
+      numRows <- sql"SELECT COUNT(rowid) FROM seeds".query[Int].unique
+      seed <- sql"SELECT seed FROM seeds LIMIT 1 OFFSET ${random.nextInt(numRows)}".query[String].option
+    } yield seed
+
+    query.map {
+      case Some(seedString) => Some(seedString.deserialize)
+      case None => None
+    }.transact(transactor).unsafeRunSync()
+  }
 
   override def toDictSchema: DictSchema[S] = {
-    // TODO can I do this without unsafeRunSync?
     new DictSchema[S](
       weights.unsafeRunSync(),
       seeds.unsafeRunSync()
