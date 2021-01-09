@@ -5,6 +5,7 @@ import cats.implicits._
 import doobie.util.transactor.Transactor
 import doobie.util.transactor.Transactor.Aux
 import doobie.implicits._
+import schema.StringDeserializable.syntax._
 import schema.StringSerializable.syntax._
 
 import scala.collection.immutable.HashMap
@@ -95,7 +96,41 @@ class FileSchema[S : StringSerializable] private(transactor: Aux[IO, Unit]) exte
 
   override def getSeed(random: Random): Option[S] = ???
 
-  override def toDictSchema: DictSchema[S] = ???
+  override def toDictSchema: DictSchema[S] = {
+    new DictSchema[S](
+      weights.unsafeRunSync(),
+      seeds.unsafeRunSync()
+    )
+  }
 
   override def toFileSchema: FileSchema[S] = this
+
+  private def seeds: IO[Seq[S]] = {
+    val query = sql"SELECT seed FROM seeds".query[String]
+    query.stream.map(_.deserialize[S]).transact(transactor).compile.toVector
+  }
+
+  private def weights: IO[HashMap[Vector[S], HashMap[S, Int]]] = {
+    val query =
+      sql"""
+        SELECT n.ngram, s.successor, s.count
+        FROM ngrams n
+        JOIN successors s ON n.id = s.ngram_id
+      """.query[(String, String, Int)]
+
+    val mappings = query.stream.map { case (ngramString, successorString, count) =>
+      val ngram = ngramString.deserialize[Vector[S]]
+      val successor = successorString.deserialize[S]
+      (ngram, successor, count)
+    }.fold(
+      new HashMap[Vector[S], HashMap[S, Int]]()
+    )((accumulatedWeights, row) => {
+      val (ngram, successorWord, count) = row
+      val currentSuccessors = accumulatedWeights.getOrElse(ngram, new HashMap[S, Int]())
+      val updatedSuccessors = currentSuccessors.updated(successorWord, count)
+      accumulatedWeights.updated(ngram, updatedSuccessors)
+    })
+
+    mappings.transact(transactor).compile.toList.map(_.head)
+  }
 }

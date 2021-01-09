@@ -29,7 +29,7 @@ object DictSchema {
   }
 }
 
-class DictSchema[S : StringSerializable] private(val weights: Weights[S], val seeds: Seq[S]) extends Schema[S] {
+class DictSchema[S : StringSerializable](val weights: Weights[S], val seeds: Seq[S]) extends Schema[S] {
   def +(other: Schema[S]): DictSchema[S] = {
     val otherAsDict = other.toDictSchema
 
