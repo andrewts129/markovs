@@ -24,6 +24,7 @@ object FileSchema {
       "org.sqlite.JDBC", s"jdbc:sqlite:$filePath"
     )
 
+    // TODO can I do this without unsafeRunSync?
     createTables(transactor).unsafeRunSync()
     addSeeds(transactor, dictSchema.seeds).unsafeRunSync()
     addWeights(transactor, dictSchema.weights).unsafeRunSync()
@@ -90,13 +91,17 @@ object FileSchema {
 }
 
 class FileSchema[S : StringSerializable] private(transactor: Aux[IO, Unit]) extends Schema[S] {
-  override def +(other: Schema[S]): Schema[S] = ???
+  override def +(other: Schema[S]): Schema[S] = {
+    // TODO do this better
+    (this.toDictSchema + other.toDictSchema).toFileSchema
+  }
 
   override def successorsOf(tokens: Vector[S]): Option[HashMap[S, Int]] = ???
 
   override def getSeed(random: Random): Option[S] = ???
 
   override def toDictSchema: DictSchema[S] = {
+    // TODO can I do this without unsafeRunSync?
     new DictSchema[S](
       weights.unsafeRunSync(),
       seeds.unsafeRunSync()
