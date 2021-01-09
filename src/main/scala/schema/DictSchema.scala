@@ -2,6 +2,7 @@ package schema
 
 import fs2.{Pure, Stream}
 import schema.DictSchema.Weights
+import schema.serialization.StringSerializable
 
 import scala.collection.immutable.HashMap
 import scala.util.Random

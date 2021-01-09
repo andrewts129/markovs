@@ -7,8 +7,9 @@ import doobie.free.connection
 import doobie.util.transactor.Transactor
 import doobie.util.transactor.Transactor.Aux
 import doobie.implicits._
-import schema.StringDeserializable.syntax._
-import schema.StringSerializable.syntax._
+import schema.serialization.StringSerializable
+import schema.serialization.StringDeserializable.syntax._
+import schema.serialization.StringSerializable.syntax._
 
 import scala.collection.immutable.HashMap
 import scala.concurrent.ExecutionContext

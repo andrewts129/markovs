@@ -1,7 +1,7 @@
-package schema
+package schema.serialization
 
 import processing.PreProcessing.PosToken
-import schema.StringSerializable.syntax._
+import schema.serialization.StringSerializable.syntax._
 
 trait StringSerializable[A] {
   def serialize(a: A): String
