@@ -17,7 +17,8 @@ object StringSerializable {
   }
 
   implicit def vectorIsSerializable[T : StringSerializable]: StringSerializable[Vector[T]] = {
-    (vector: Vector[T]) => vector.map(_.serialize).mkString("\n")
+    // Add a trailing newline to differentiate vectors of size one from lone S objects
+    (vector: Vector[T]) => vector.map(_.serialize).mkString("\n") ++ "\n"
   }
 
   object syntax {
