@@ -1,4 +1,4 @@
-import PostProcessing.detokenize
+import processing.PostProcessing.detokenize
 
 import java.nio.file.{Path, Paths}
 import cats.effect.{Blocker, ExitCode, IO, IOApp}

@@ -1,6 +1,7 @@
 import Model.selectRandomWeighted
-import PreProcessing.PosToken
+import processing.PreProcessing.PosToken
 import fs2.{Pure, Stream}
+import processing.PreProcessing
 import schema.{DictSchema, Schema}
 
 import scala.util.Random
