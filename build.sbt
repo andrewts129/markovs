@@ -1,5 +1,5 @@
-name := "markov_scala"
-
+name := "markovs"
+organization := "io.andrewsmith"
 version := "0.1"
 
 scalaVersion := "2.13.3"
