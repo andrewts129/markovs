@@ -12,7 +12,7 @@ object Main extends IOApp {
         .through(text.lines)
     }
 
-    val model = Model[IO](input.take(2000), 2)
+    val model = Model.persistent[IO]("default.schema", input.take(2000), 2)
     val generatedTokens = model.flatMap(_.generate)
 
     generatedTokens.through(detokenize).intersperse(" ").map(print(_)).compile.drain.as(ExitCode.Success)

@@ -12,5 +12,5 @@ trait Schema[S] {
 
   def toDictSchema: DictSchema[S]
 
-  def toFileSchema: FileSchema[S]
+  def toFileSchema(filePath: String): FileSchema[S]
 }

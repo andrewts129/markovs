@@ -2,18 +2,24 @@ import Model.selectRandomWeighted
 import processing.PreProcessing.PosToken
 import fs2.{Pure, Stream}
 import processing.PreProcessing
-import schema.{DictSchema, Schema}
+import schema.{DictSchema, FileSchema, Schema}
 
 import scala.util.Random
 
 object Model {
-  def apply[F[_]](corpus: Stream[F, String], n: Int): Stream[F, Model[PosToken, DictSchema]] = {
-    corpus.map(Model(_, n)).reduce(_ + _)
+  def memory[F[_]](corpus: Stream[F, String], n: Int): Stream[F, Model[PosToken, DictSchema]] = {
+    corpus.map(Model.memory(_, n)).reduce(_ + _)
   }
 
-  def apply(document: String, n: Int): Model[PosToken, DictSchema] = {
+  def memory(document: String, n: Int): Model[PosToken, DictSchema] = {
     val processedTokens = PreProcessing.all(document, 2, n + 2)
     new Model(DictSchema(processedTokens), n)
+  }
+
+  def persistent[F[_]](filePath: String, corpus: Stream[F, String], n: Int): Stream[F, Model[PosToken, FileSchema]] = {
+    memory(corpus, n).map(
+      memoryModel => new Model(memoryModel.schema.toFileSchema(filePath), n)
+    )
   }
 
   private def selectRandomWeighted[S](itemsWeighted: Map[S, Int], random: Random): S = {

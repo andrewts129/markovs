@@ -32,7 +32,7 @@ object FileSchema {
     addSeeds(transactor, dictSchema.seeds).unsafeRunSync()
     addWeights(transactor, dictSchema.weights).unsafeRunSync()
 
-    new FileSchema[S](transactor)
+    new FileSchema[S](filePath, transactor)
   }
 
   private def createTables(transactor: Aux[IO, Unit]): IO[List[Int]] = {
@@ -93,10 +93,10 @@ object FileSchema {
   }
 }
 
-class FileSchema[S : StringSerializable] private(transactor: Aux[IO, Unit]) extends Schema[S] {
+class FileSchema[S : StringSerializable] private(filePath: String, transactor: Aux[IO, Unit]) extends Schema[S] {
   override def +(other: Schema[S]): Schema[S] = {
     // TODO do this better
-    (this.toDictSchema + other.toDictSchema).toFileSchema
+    (this.toDictSchema + other.toDictSchema).toFileSchema(this.filePath)
   }
 
   override def successorsOf(tokens: Vector[S]): Option[HashMap[S, Int]] = {
@@ -143,7 +143,13 @@ class FileSchema[S : StringSerializable] private(transactor: Aux[IO, Unit]) exte
     )
   }
 
-  override def toFileSchema: FileSchema[S] = this
+  override def toFileSchema(filePath: String): FileSchema[S] = {
+    if (filePath == this.filePath) {
+      this
+    } else {
+      FileSchema(filePath, this.toDictSchema)
+    }
+  }
 
   private def seeds: IO[Seq[S]] = {
     val query = sql"SELECT seed FROM seeds".query[String]

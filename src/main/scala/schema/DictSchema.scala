@@ -56,8 +56,8 @@ class DictSchema[S : StringSerializable](val weights: Weights[S], val seeds: Seq
 
   override def toDictSchema: DictSchema[S] = this
 
-  override def toFileSchema: FileSchema[S] = {
-    FileSchema("default.schema", this)
+  override def toFileSchema(filePath: String): FileSchema[S] = {
+    FileSchema(filePath, this)
   }
 
   override def toString: String = {
