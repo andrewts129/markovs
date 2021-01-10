@@ -1,8 +1,8 @@
+import cats.effect.{Blocker, ExitCode, IO, IOApp}
+import fs2.{Stream, io, text}
 import processing.PostProcessing.detokenize
 
 import java.nio.file.{Path, Paths}
-import cats.effect.{Blocker, ExitCode, IO, IOApp}
-import fs2.{Stream, io, text}
 
 object Main extends IOApp {
   def run(args: List[String]): IO[ExitCode] = {

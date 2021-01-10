@@ -1,14 +1,12 @@
 package schema
 
 import cats.effect.{ContextShift, IO}
-import cats.free.Free
 import cats.implicits._
-import doobie.free.connection
+import doobie.implicits._
 import doobie.util.transactor.Transactor
 import doobie.util.transactor.Transactor.Aux
-import doobie.implicits._
-import schema.serialization.StringSerializable
 import schema.serialization.StringDeserializable.syntax._
+import schema.serialization.StringSerializable
 import schema.serialization.StringSerializable.syntax._
 
 import scala.collection.immutable.HashMap
