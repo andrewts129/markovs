@@ -149,6 +149,17 @@ class FileSchema[S : StringSerializable] private(filePath: String, transactor: A
     }
   }
 
+  override def n: Int = {
+    // Gets the max number of newlines in an ngram
+    val query =
+      sql"""
+        SELECT MAX(LENGTH(ngram) - LENGTH((REPLACE(ngram, CHAR(10), ''))))
+        FROM ngrams
+      """.query[Int].unique
+
+    query.transact(transactor).unsafeRunSync()
+  }
+
   private def seeds: IO[Seq[S]] = {
     val query = sql"SELECT seed FROM seeds".query[String]
     query.stream.map(_.deserialize[S]).transact(transactor).compile.toVector

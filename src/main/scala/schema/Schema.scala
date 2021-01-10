@@ -13,4 +13,6 @@ trait Schema[S] {
   def toDictSchema: DictSchema[S]
 
   def toFileSchema(filePath: String): FileSchema[S]
+
+  def n: Int
 }

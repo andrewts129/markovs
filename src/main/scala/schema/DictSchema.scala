@@ -60,6 +60,10 @@ class DictSchema[S : StringSerializable](val weights: Weights[S], val seeds: Seq
     FileSchema(filePath, this)
   }
 
+  override def n: Int = {
+    this.weights.keys.map(_.size).max
+  }
+
   override def toString: String = {
     val sortedWeights = weights.toVector.sortBy { case (ngram, _) => (-ngram.length, ngram.mkString) }
     sortedWeights.map { case (ngram, successors) =>
