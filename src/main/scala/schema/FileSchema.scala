@@ -21,6 +21,14 @@ object FileSchema {
 
   implicit val cs: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
 
+  def apply[S : StringSerializable](filePath: String): FileSchema[S] = {
+    val transactor = Transactor.fromDriverManager[IO](
+      "org.sqlite.JDBC", s"jdbc:sqlite:$filePath"
+    )
+
+    new FileSchema[S](filePath, transactor)
+  }
+
   def apply[S : StringSerializable](filePath: String, dictSchema: DictSchema[S]): FileSchema[S] = {
     val transactor = Transactor.fromDriverManager[IO](
       "org.sqlite.JDBC", s"jdbc:sqlite:$filePath"

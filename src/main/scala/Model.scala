@@ -1,4 +1,5 @@
 import Model.selectRandomWeighted
+import cats.effect.IO
 import fs2.{Pure, Stream}
 import processing.PreProcessing
 import processing.PreProcessing.PosToken
@@ -20,6 +21,11 @@ object Model {
     memory(corpus, n).map(
       memoryModel => new Model(memoryModel.schema.toFileSchema(filePath), n)
     )
+  }
+
+  def load(filePath: String): Stream[IO, Model[PosToken, FileSchema]] = {
+    val schema = FileSchema[PosToken](filePath)
+    Stream.emit(new Model(schema, schema.n))
   }
 
   private def selectRandomWeighted[S](itemsWeighted: Map[S, Int], random: Random): S = {
