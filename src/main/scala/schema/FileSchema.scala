@@ -13,7 +13,6 @@ import scala.collection.immutable.HashMap
 import scala.concurrent.ExecutionContext
 import scala.util.Random
 
-// TODO get rid of all the unsafeRunSync
 object FileSchema {
   case class Seed(id: Long, seed: String)
   case class Ngram(id: Long, ngram: String)
@@ -29,16 +28,17 @@ object FileSchema {
     new FileSchema[S](filePath, transactor)
   }
 
-  def apply[S : StringSerializable](filePath: String, dictSchema: DictSchema[S]): FileSchema[S] = {
+  def apply[S : StringSerializable](filePath: String, dictSchema: DictSchema[S]): IO[FileSchema[S]] = {
     val transactor = Transactor.fromDriverManager[IO](
       "org.sqlite.JDBC", s"jdbc:sqlite:$filePath"
     )
 
-    createTables(transactor).unsafeRunSync()
-    addSeeds(transactor, dictSchema.seeds).unsafeRunSync()
-    addWeights(transactor, dictSchema.weights).unsafeRunSync()
-
-    new FileSchema[S](filePath, transactor)
+    for {
+      _ <- createTables(transactor)
+      _ <- addSeeds(transactor, dictSchema.seeds)
+      _ <- addWeights(transactor, dictSchema.weights)
+      schema <- IO { new FileSchema[S](filePath, transactor) }
+    } yield schema
   }
 
   private def createTables(transactor: Aux[IO, Unit]): IO[List[Int]] = {
@@ -100,12 +100,18 @@ object FileSchema {
 }
 
 class FileSchema[S : StringSerializable] private(filePath: String, transactor: Aux[IO, Unit]) extends Schema[S] {
-  override def +(other: Schema[S]): Schema[S] = {
+  override def +(other: Schema[S]): IO[Schema[S]] = {
     // TODO do this better
-    (this.toDictSchema + other.toDictSchema).toFileSchema(this.filePath)
+    val schema = for {
+      thisAsDict <- this.toDictSchema
+      thatAsDict <- other.toDictSchema
+      combinedSchema <- thisAsDict + thatAsDict
+    } yield combinedSchema
+
+    schema.flatMap(_.toFileSchema(filePath))
   }
 
-  override def successorsOf(tokens: Vector[S]): Option[HashMap[S, Int]] = {
+  override def successorsOf(tokens: Vector[S]): IO[Option[HashMap[S, Int]]] = {
     val query =
       sql"""
         SELECT s.successor, s.count
@@ -123,14 +129,15 @@ class FileSchema[S : StringSerializable] private(filePath: String, transactor: A
       accumulatedSuccessors.updated(successor, count)
     })
 
-    val result = mappings.transact(transactor).compile.toList.map(_.head).unsafeRunSync()
-    result.size match {
-      case 0 => None
-      case _ => Some(result)
-    }
+    mappings.transact(transactor).compile.toList.map(_.head).map(
+      result => result.size match {
+        case 0 => None
+        case _ => Some(result)
+      }
+    )
   }
 
-  override def getSeed(random: Random): Option[S] = {
+  override def getSeed(random: Random): IO[Option[S]] = {
     val query = for {
       numRows <- sql"SELECT COUNT(rowid) FROM seeds".query[Int].unique
       seed <- sql"SELECT seed FROM seeds LIMIT 1 OFFSET ${random.nextInt(numRows)}".query[String].option
@@ -139,25 +146,28 @@ class FileSchema[S : StringSerializable] private(filePath: String, transactor: A
     query.map {
       case Some(seedString) => Some(seedString.deserialize)
       case None => None
-    }.transact(transactor).unsafeRunSync()
+    }.transact(transactor)
   }
 
-  override def toDictSchema: DictSchema[S] = {
-    new DictSchema[S](
-      weights.unsafeRunSync(),
-      seeds.unsafeRunSync()
-    )
+  override def toDictSchema: IO[DictSchema[S]] = {
+    for {
+      weights <- this.weights
+      seeds <- this.seeds
+      schema <- IO { new DictSchema[S](weights, seeds) }
+    } yield schema
   }
 
-  override def toFileSchema(filePath: String): FileSchema[S] = {
+  override def toFileSchema(filePath: String): IO[FileSchema[S]] = {
     if (filePath == this.filePath) {
-      this
+      IO.pure { this }
     } else {
-      FileSchema(filePath, this.toDictSchema)
+      this.toDictSchema.flatMap(
+        asDict => FileSchema[S](filePath, asDict)
+      )
     }
   }
 
-  override def n: Int = {
+  override def n: IO[Int] = {
     // Gets the max number of newlines in an ngram
     val query =
       sql"""
@@ -165,7 +175,7 @@ class FileSchema[S : StringSerializable] private(filePath: String, transactor: A
         FROM ngrams
       """.query[Int].unique
 
-    query.transact(transactor).unsafeRunSync()
+    query.transact(transactor)
   }
 
   private def seeds: IO[Seq[S]] = {

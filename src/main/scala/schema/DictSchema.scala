@@ -1,5 +1,6 @@
 package schema
 
+import cats.effect.IO
 import fs2.{Pure, Stream}
 import schema.DictSchema.Weights
 import schema.serialization.StringSerializable
@@ -11,7 +12,7 @@ import scala.util.Random
 object DictSchema {
   type Weights[S] = HashMap[Vector[S], HashMap[S, Int]]
 
-  def apply[S : StringSerializable](ngrams: Stream[Pure, Vector[S]]): DictSchema[S] = {
+  def apply[F[_], S : StringSerializable](ngrams: Stream[Pure, Vector[S]]): DictSchema[S] = {
     val weights = ngrams.fold(
       new Weights[S]()
     )((weights, ngram) => {
@@ -31,37 +32,45 @@ object DictSchema {
 }
 
 class DictSchema[S : StringSerializable](val weights: Weights[S], val seeds: Seq[S]) extends Schema[S] {
-  def +(other: Schema[S]): DictSchema[S] = {
-    val otherAsDict = other.toDictSchema
+  def +(other: Schema[S]): IO[DictSchema[S]] = {
+    other.toDictSchema.flatMap(otherAsDict => {
+      val newWeights = weights.merged(otherAsDict.weights) { case ((firstWord, thisSuccessors), (_, otherSuccessors)) =>
+        firstWord -> thisSuccessors.merged(otherSuccessors) { case ((secondWord, thisCount), (_, otherCount)) =>
+          secondWord -> (thisCount + otherCount)
+        }
+      }
 
-    val newWeights = weights.merged(otherAsDict.weights) { case ((firstWord, thisSuccessors), (_, otherSuccessors)) =>
-      firstWord -> thisSuccessors.merged(otherSuccessors) { case ((secondWord, thisCount), (_, otherCount)) =>
-        secondWord -> (thisCount + otherCount)
+      IO.pure {
+        new DictSchema(newWeights, seeds ++ otherAsDict.seeds)
+      }
+    })
+  }
+
+  override def successorsOf(tokens: Vector[S]): IO[Option[HashMap[S, Int]]] = {
+    IO.pure {
+      weights.get(tokens)
+    }
+  }
+
+  override def getSeed(random: Random): IO[Option[S]] = {
+    IO.pure {
+      seeds.size match {
+        case 0 => None
+        case n => Some(seeds(random.nextInt(n)))
       }
     }
-
-    new DictSchema(newWeights, seeds ++ otherAsDict.seeds)
   }
 
-  override def successorsOf(tokens: Vector[S]): Option[HashMap[S, Int]] = {
-    weights.get(tokens)
-  }
+  override def toDictSchema: IO[DictSchema[S]] = IO.pure { this }
 
-  override def getSeed(random: Random): Option[S] = {
-    seeds.size match {
-      case 0 => None
-      case n => Some(seeds(random.nextInt(n)))
-    }
-  }
-
-  override def toDictSchema: DictSchema[S] = this
-
-  override def toFileSchema(filePath: String): FileSchema[S] = {
+  override def toFileSchema(filePath: String): IO[FileSchema[S]] = {
     FileSchema(filePath, this)
   }
 
-  override def n: Int = {
-    this.weights.keys.map(_.size).max
+  override def n: IO[Int] = {
+    IO.pure {
+      this.weights.keys.map(_.size).max
+    }
   }
 
   override def toString: String = {

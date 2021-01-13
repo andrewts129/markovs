@@ -1,18 +1,20 @@
 package schema
 
+import cats.effect.IO
+
 import scala.collection.immutable.HashMap
 import scala.util.Random
 
 trait Schema[S] {
-  def +(other: Schema[S]): Schema[S]
+  def +(other: Schema[S]): IO[Schema[S]]
 
-  def successorsOf(tokens: Vector[S]): Option[HashMap[S, Int]]
+  def successorsOf(tokens: Vector[S]): IO[Option[HashMap[S, Int]]]
 
-  def getSeed(random: Random): Option[S]
+  def getSeed(random: Random): IO[Option[S]]
 
-  def toDictSchema: DictSchema[S]
+  def toDictSchema: IO[DictSchema[S]]
 
-  def toFileSchema(filePath: String): FileSchema[S]
+  def toFileSchema(filePath: String): IO[FileSchema[S]]
 
-  def n: Int
+  def n: IO[Int]
 }

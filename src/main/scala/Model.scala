@@ -1,6 +1,6 @@
 import Model.selectRandomWeighted
 import cats.effect.IO
-import fs2.{Pure, Stream}
+import fs2.Stream
 import processing.PreProcessing
 import processing.PreProcessing.PosToken
 import schema.{DictSchema, FileSchema, Schema}
@@ -8,8 +8,8 @@ import schema.{DictSchema, FileSchema, Schema}
 import scala.util.Random
 
 object Model {
-  def memory[F[_]](corpus: Stream[F, String], n: Int): Stream[F, Model[PosToken, DictSchema]] = {
-    corpus.map(Model.memory(_, n)).reduce(_ + _)
+  def memory(corpus: Stream[IO, String], n: Int): Stream[IO, Model[PosToken, DictSchema]] = {
+    corpus.map(Model.memory(_, n)).reduce((a, b) => (a + b).unsafeRunSync()) // TODO
   }
 
   def memory(document: String, n: Int): Model[PosToken, DictSchema] = {
@@ -17,15 +17,20 @@ object Model {
     new Model(DictSchema(processedTokens), n)
   }
 
-  def persistent[F[_]](filePath: String, corpus: Stream[F, String], n: Int): Stream[F, Model[PosToken, FileSchema]] = {
-    memory(corpus, n).map(
-      memoryModel => new Model(memoryModel.schema.toFileSchema(filePath), n)
+  def persistent(filePath: String, corpus: Stream[IO, String], n: Int): Stream[IO, Model[PosToken, FileSchema]] = {
+    memory(corpus, n).evalMap(
+      memoryModel => {
+        val fileSchema = memoryModel.schema.toFileSchema(filePath)
+        fileSchema.map(new Model[PosToken, FileSchema](_, n))
+      }
     )
   }
 
   def load(filePath: String): Stream[IO, Model[PosToken, FileSchema]] = {
     val schema = FileSchema[PosToken](filePath)
-    Stream.emit(new Model(schema, schema.n))
+    Stream.eval(schema.n).map(
+      n => new Model(schema, n)
+    )
   }
 
   private def selectRandomWeighted[S](itemsWeighted: Map[S, Int], random: Random): S = {
@@ -46,41 +51,40 @@ class Model[S, T[_] <: Schema[_]] private(val schema: Schema[S], val n: Int, val
     case None => new Random()
   }
 
-  def +(other: Model[S, T]): Model[S, T] = {
-    new Model[S, T](this.schema + other.schema, math.max(this.n, other.n), randomSeed)
+  def +(other: Model[S, T]): IO[Model[S, T]] = {
+    (this.schema + other.schema).map(
+      newSchema => new Model[S, T](newSchema, math.max(this.n, other.n), randomSeed)
+    )
   }
 
-  def generate: Stream[Pure, S] = {
-    schema.getSeed(random) match {
+  def generate: Stream[IO, S] = {
+    Stream.eval(schema.getSeed(random)).flatMap {
       case Some(seed) => generate(Stream.emit(seed))
       case None => Stream.empty
     }
   }
 
-  def generate(seed: Stream[Pure, S]): Stream[Pure, S] = {
+  def generate(seed: Stream[IO, S]): Stream[IO, S] = {
     seed ++ nextStreaming(seed)
   }
 
-  private def next(tokens: Stream[Pure, S]): Option[S] = {
-    val possibleNextTokens = Stream.range(this.n, 0 , -1).map(n => nextWithN(tokens, n)).unNone
-    possibleNextTokens.head.toVector match {
-      case nextToken +: _ => Some(nextToken)
-      case Vector() => None
-    }
+  private def next(tokens: Stream[IO, S]): IO[Option[S]] = {
+    val possibleNextTokens = Stream.range(this.n, 0 , -1).evalMap(n => nextWithN(tokens, n)).unNone
+    possibleNextTokens.head.compile.toList.map(_.headOption)
   }
 
-  private def nextWithN(tokens: Stream[Pure, S], n: Int): Option[S] = {
-    tokens.takeRight(n).toVector match {
-      case Vector() => None
-      case lastTokens => schema.successorsOf(lastTokens) match {
+  private def nextWithN(tokens: Stream[IO, S], n: Int): IO[Option[S]] = {
+    tokens.takeRight(n).compile.toVector.flatMap {
+      case Vector() => IO.pure { None }
+      case lastTokens => schema.successorsOf(lastTokens).map {
         case Some(successors) => Some(selectRandomWeighted(successors, random))
         case None => None
       }
     }
   }
 
-  private def nextStreaming(tokens: Stream[Pure, S]): Stream[Pure, S] = {
-    next(tokens) match {
+  private def nextStreaming(tokens: Stream[IO, S]): Stream[IO, S] = {
+    Stream.eval(next(tokens)).flatMap {
       case Some(nextToken) =>
         val nextTokenAsStream = Stream.emit(nextToken)
         nextTokenAsStream ++ nextStreaming(tokens ++ nextTokenAsStream)
