@@ -9,5 +9,7 @@ libraryDependencies ++= Seq(
   "co.fs2" %% "fs2-io" % "2.4.4",
   "org.apache.opennlp" % "opennlp-tools" % "1.9.3",
   "org.tpolecat" %% "doobie-core" % "0.9.0",
-  "org.xerial" % "sqlite-jdbc" % "3.32.3"
+  "org.xerial" % "sqlite-jdbc" % "3.32.3",
+  "com.monovore" %% "decline" % "1.3.0",
+  "com.monovore" %% "decline-effect" % "1.3.0"
 )
