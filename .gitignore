@@ -1,6 +1,6 @@
 **/target/
 .bsp/
 .idea/
-src/main/resources/*.txt
+data/
 *.bin
 *.schema
