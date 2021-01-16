@@ -18,6 +18,7 @@ object Main extends CommandIOApp(
     val outputSourceFileOpt = Opts.option[Path]("output", short = "o", help = "File to dump schema to").withDefault(Path.of("default.schema"))
     val inputSchemaFileOpt = Opts.option[Path]("read", short = "r", help = "Schema file to load").orNone
     val ngramSizeOpt = Opts.option[Int]("ngram-size", short = "n", help = "Max ngram size to use").withDefault(2)
+    val generateOpt = Opts.flag("generate", short = "g", help = "Generate text after loading the model").orFalse
 
     val validatedInput = (inputSourceFileOpt, inputSchemaFileOpt).mapN {
       (inputSourceFile, inputSchemaFile) => {
@@ -31,8 +32,8 @@ object Main extends CommandIOApp(
       }
     }
 
-    (validatedInput, outputSourceFileOpt, ngramSizeOpt).mapN {
-      case (Validated.Valid(bothInputFiles), outputSourceFile, ngramSize) =>
+    (validatedInput, outputSourceFileOpt, ngramSizeOpt, generateOpt).mapN {
+      case (Validated.Valid(bothInputFiles), outputSourceFile, ngramSize, shouldGenerate) =>
         val model = bothInputFiles match {
           case (Some(inputSourceFile), None) =>
             val input = Stream.resource(Blocker[IO]).flatMap { blocker =>
@@ -47,9 +48,13 @@ object Main extends CommandIOApp(
           case _ => throw new Exception("Illegal arguments")
         }
 
-        val generatedTokens = model.flatMap(_.generate)
-        generatedTokens.through(detokenize).intersperse(" ").map(print(_)).compile.drain.as(ExitCode.Success)
-      case (Validated.Invalid(errorMessage), _, _) => IO {
+        if (shouldGenerate) {
+          val generatedTokens = model.flatMap(_.generate)
+          generatedTokens.through(detokenize).intersperse(" ").map(print(_)).compile.drain.as(ExitCode.Success)
+        } else {
+          model.compile.drain.as(ExitCode.Success)
+        }
+      case (Validated.Invalid(errorMessage), _, _, _) => IO {
         println(errorMessage)
         ExitCode.Error
       }
