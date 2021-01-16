@@ -14,7 +14,13 @@ object DictSchema {
   type Weights[S] = HashMap[Vector[S], HashMap[S, Int]]
 
   def apply[S : StringSerializable](corpus: Stream[IO, Stream[Pure, Vector[S]]]): Stream[IO, DictSchema[S]] = {
-    val data = corpus.fold(
+    parseCorpus(corpus).map {
+      case (weights, seeds) => new DictSchema[S](weights, seeds)
+    }
+  }
+
+  private def parseCorpus[S : StringSerializable](corpus: Stream[IO, Stream[Pure, Vector[S]]]): Stream[IO, (Weights[S], List[S])] = {
+    corpus.fold(
       (new Weights[S](), List[S]())
     )((accumulated, document) => {
       val (weights, seeds) = accumulated
@@ -35,10 +41,6 @@ object DictSchema {
 
       (newWeights, newSeeds)
     })
-
-    data.map {
-      case (weights, seeds) => new DictSchema[S](weights, seeds)
-    }
   }
 }
 
