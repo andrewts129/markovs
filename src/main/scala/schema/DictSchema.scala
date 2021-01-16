@@ -13,22 +13,32 @@ import scala.util.Random
 object DictSchema {
   type Weights[S] = HashMap[Vector[S], HashMap[S, Int]]
 
-  def apply[F[_], S : StringSerializable](ngrams: Stream[Pure, Vector[S]]): DictSchema[S] = {
-    val weights = ngrams.fold(
-      new Weights[S]()
-    )((weights, ngram) => {
-      val successors = weights.getOrElse(ngram.init, new HashMap[S, Int]())
-      val count = successors.getOrElse(ngram.last, 0)
-      val newSuccessors = successors.updated(ngram.last, count + 1)
-      weights.updated(ngram.init, newSuccessors)
-    }).toVector.head
+  def apply[S : StringSerializable](corpus: Stream[IO, Stream[Pure, Vector[S]]]): Stream[IO, DictSchema[S]] = {
+    val data = corpus.fold(
+      (new Weights[S](), List[S]())
+    )((accumulated, document) => {
+      val (weights, seeds) = accumulated
 
-    val seeds = weights.size match {
-      case 0 => Vector()
-      case _ => Vector(ngrams.head.toVector.head.head)
+      val newSeeds = document.head.toList.headOption match {
+        case Some(firstNgram) => seeds :+ firstNgram.head
+        case None => seeds
+      }
+
+      val newWeights = document.fold(
+        weights
+      )((accWeights, ngram) => {
+        val successors = accWeights.getOrElse(ngram.init, new HashMap[S, Int]())
+        val count = successors.getOrElse(ngram.last, 0)
+        val newSuccessors = successors.updated(ngram.last, count + 1)
+        accWeights.updated(ngram.init, newSuccessors)
+      }).toVector.head
+
+      (newWeights, newSeeds)
+    })
+
+    data.map {
+      case (weights, seeds) => new DictSchema[S](weights, seeds)
     }
-
-    new DictSchema(weights, seeds)
   }
 }
 

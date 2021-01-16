@@ -10,12 +10,9 @@ import scala.util.Random
 
 object Model {
   def memory(corpus: Stream[IO, String], n: Int): Stream[IO, Model[PosToken, DictSchema]] = {
-    corpus.map(Model.memory(_, n)).reduce((a, b) => (a + b).unsafeRunSync()) // TODO
-  }
-
-  def memory(document: String, n: Int): Model[PosToken, DictSchema] = {
-    val processedTokens = PreProcessing.all(document, 2, n + 2)
-    new Model(DictSchema(processedTokens), n)
+    val processed = corpus.map(document => PreProcessing.all(document, 2, n + 2))
+    val schema = DictSchema(processed)
+    schema.map(new Model[PosToken, DictSchema](_, 2))
   }
 
   def persistent(filePath: Path, corpus: Stream[IO, String], n: Int): Stream[IO, Model[PosToken, FileSchema]] = {
