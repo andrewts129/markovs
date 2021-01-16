@@ -5,6 +5,7 @@ import processing.PreProcessing
 import processing.PreProcessing.PosToken
 import schema.{DictSchema, FileSchema, Schema}
 
+import java.nio.file.Path
 import scala.util.Random
 
 object Model {
@@ -17,7 +18,7 @@ object Model {
     new Model(DictSchema(processedTokens), n)
   }
 
-  def persistent(filePath: String, corpus: Stream[IO, String], n: Int): Stream[IO, Model[PosToken, FileSchema]] = {
+  def persistent(filePath: Path, corpus: Stream[IO, String], n: Int): Stream[IO, Model[PosToken, FileSchema]] = {
     memory(corpus, n).evalMap(
       memoryModel => {
         val fileSchema = memoryModel.schema.toFileSchema(filePath)
@@ -26,7 +27,7 @@ object Model {
     )
   }
 
-  def load(filePath: String): Stream[IO, Model[PosToken, FileSchema]] = {
+  def load(filePath: Path): Stream[IO, Model[PosToken, FileSchema]] = {
     val schema = FileSchema[PosToken](filePath)
     Stream.eval(schema.n).map(
       n => new Model(schema, n)

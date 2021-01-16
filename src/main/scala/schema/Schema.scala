@@ -2,6 +2,7 @@ package schema
 
 import cats.effect.IO
 
+import java.nio.file.Path
 import scala.collection.immutable.HashMap
 import scala.util.Random
 
@@ -14,7 +15,7 @@ trait Schema[S] {
 
   def toDictSchema: IO[DictSchema[S]]
 
-  def toFileSchema(filePath: String): IO[FileSchema[S]]
+  def toFileSchema(filePath: Path): IO[FileSchema[S]]
 
   def n: IO[Int]
 }

@@ -9,6 +9,7 @@ import schema.serialization.StringDeserializable.syntax._
 import schema.serialization.StringSerializable
 import schema.serialization.StringSerializable.syntax._
 
+import java.nio.file.{Files, Path}
 import scala.collection.immutable.HashMap
 import scala.concurrent.ExecutionContext
 import scala.util.Random
@@ -20,17 +21,17 @@ object FileSchema {
 
   implicit val cs: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
 
-  def apply[S : StringSerializable](filePath: String): FileSchema[S] = {
+  def apply[S : StringSerializable](filePath: Path): FileSchema[S] = {
     val transactor = Transactor.fromDriverManager[IO](
-      "org.sqlite.JDBC", s"jdbc:sqlite:$filePath"
+      "org.sqlite.JDBC", s"jdbc:sqlite:${filePath.toAbsolutePath.toString}"
     )
 
     new FileSchema[S](filePath, transactor)
   }
 
-  def apply[S : StringSerializable](filePath: String, dictSchema: DictSchema[S]): IO[FileSchema[S]] = {
+  def apply[S : StringSerializable](filePath: Path, dictSchema: DictSchema[S]): IO[FileSchema[S]] = {
     val transactor = Transactor.fromDriverManager[IO](
-      "org.sqlite.JDBC", s"jdbc:sqlite:$filePath"
+      "org.sqlite.JDBC", s"jdbc:sqlite:${filePath.toAbsolutePath.toString}"
     )
 
     for {
@@ -99,7 +100,7 @@ object FileSchema {
   }
 }
 
-class FileSchema[S : StringSerializable] private(filePath: String, transactor: Aux[IO, Unit]) extends Schema[S] {
+class FileSchema[S : StringSerializable] private(filePath: Path, transactor: Aux[IO, Unit]) extends Schema[S] {
   override def +(other: Schema[S]): IO[Schema[S]] = {
     // TODO do this better
     val schema = for {
@@ -157,8 +158,8 @@ class FileSchema[S : StringSerializable] private(filePath: String, transactor: A
     } yield schema
   }
 
-  override def toFileSchema(filePath: String): IO[FileSchema[S]] = {
-    if (filePath == this.filePath) {
+  override def toFileSchema(filePath: Path): IO[FileSchema[S]] = {
+    if (Files.isSameFile(filePath, this.filePath)) {
       IO.pure { this }
     } else {
       this.toDictSchema.flatMap(

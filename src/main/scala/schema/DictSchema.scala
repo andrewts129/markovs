@@ -5,6 +5,7 @@ import fs2.{Pure, Stream}
 import schema.DictSchema.Weights
 import schema.serialization.StringSerializable
 
+import java.nio.file.Path
 import scala.collection.immutable.HashMap
 import scala.util.Random
 
@@ -63,7 +64,7 @@ class DictSchema[S : StringSerializable](val weights: Weights[S], val seeds: Seq
 
   override def toDictSchema: IO[DictSchema[S]] = IO.pure { this }
 
-  override def toFileSchema(filePath: String): IO[FileSchema[S]] = {
+  override def toFileSchema(filePath: Path): IO[FileSchema[S]] = {
     FileSchema(filePath, this)
   }
 
