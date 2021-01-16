@@ -15,10 +15,6 @@ import scala.concurrent.ExecutionContext
 import scala.util.Random
 
 object FileSchema {
-  case class Seed(id: Long, seed: String)
-  case class Ngram(id: Long, ngram: String)
-  case class Successor(id: Long, successor: String, count: Int, ngramId: Long)
-
   implicit val cs: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
 
   def apply[S : StringSerializable](filePath: Path): FileSchema[S] = {
