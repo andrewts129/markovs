@@ -1,22 +1,31 @@
 package schema
 
-import cats.effect.IO
+import cats.effect.{ContextShift, IO}
 import fs2.{Pure, Stream}
 import schema.DictSchema.Weights
 import schema.serialization.StringSerializable
 
 import java.nio.file.Path
 import scala.collection.immutable.HashMap
+import scala.concurrent.ExecutionContext
 import scala.util.Random
 
 
 object DictSchema {
   type Weights[S] = HashMap[Vector[S], HashMap[S, Int]]
 
+  implicit val cs: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
+
   def apply[S : StringSerializable](corpus: Stream[IO, Stream[Pure, Vector[S]]]): Stream[IO, DictSchema[S]] = {
-    parseCorpus(corpus).map {
-      case (weights, seeds) => new DictSchema[S](weights, seeds)
-    }
+    val numParallelStreams = Runtime.getRuntime.availableProcessors()
+
+    corpus.balanceAvailable.take(numParallelStreams).map(
+       parseCorpus(_).map {
+         case (weights, seeds) => new DictSchema[S](weights, seeds)
+       }
+    ).parJoin(numParallelStreams).reduce(
+      (first, second) => (first + second).unsafeRunSync() // DictSchema addition has no side effects, so this is safe
+    )
   }
 
   private def parseCorpus[S : StringSerializable](corpus: Stream[IO, Stream[Pure, Vector[S]]]): Stream[IO, (Weights[S], List[S])] = {
