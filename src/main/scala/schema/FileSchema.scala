@@ -41,7 +41,6 @@ object FileSchema {
   private def createTables(transactor: Transactor[IO]): IO[List[Int]] = {
     val queries = List(
       sql"DROP TABLE IF EXISTS seeds",
-      sql"DROP TABLE IF EXISTS ngrams",
       sql"DROP TABLE IF EXISTS successors",
       sql"""
         CREATE TABLE seeds (
@@ -50,20 +49,14 @@ object FileSchema {
          )
       """,
       sql"""
-        CREATE TABLE ngrams (
-          id    INTEGER PRIMARY KEY,
-          ngram TEXT NOT NULL UNIQUE
-        )
-      """,
-      sql"""
         CREATE TABLE successors (
           id        INTEGER PRIMARY KEY,
-          ngram_id  INTEGER NOT NULL,
+          ngram     TEXT NOT NULL,
           successor TEXT NOT NULL,
-          count     INTEGER NOT NULL,
-          FOREIGN KEY(ngram_id) REFERENCES ngrams(id)
+          count     INTEGER NOT NULL
         )
-      """
+      """,
+      sql"CREATE INDEX ngram_index ON successors (ngram)"
     )
 
     queries.traverse(_.update.run).transact(transactor)
@@ -77,22 +70,18 @@ object FileSchema {
     inserts.toList.sequence.transact(transactor)
   }
 
-  private def addWeights[S : StringSerializable](transactor: Transactor[IO], weights: HashMap[Vector[S], HashMap[S, Int]]): IO[List[Long]] = {
-    val inserts = weights.map { case (ngram, successors) =>
-      for {
-        _ <- sql"INSERT INTO ngrams (ngram) VALUES (${ngram.serialize})".update.run
-        id <- sql"SELECT last_insert_rowid()".query[Long].unique
-        _ <- successorInserts(id, successors)
-      } yield id
+  private def addWeights[S : StringSerializable](transactor: Transactor[IO], weights: HashMap[Vector[S], HashMap[S, Int]]): IO[List[Int]] = {
+    val inserts = weights.flatMap {
+      case (ngram, successors) => successorInserts(ngram, successors)
     }
 
     inserts.toList.sequence.transact(transactor)
   }
 
-  private def successorInserts[S : StringSerializable](ngramId: Long, successors: HashMap[S, Int]): ConnectionIO[List[Int]] = {
+  private def successorInserts[S : StringSerializable](ngram: Vector[S], successors: HashMap[S, Int]): List[ConnectionIO[Int]] = {
     successors.map { case (successor, count) =>
-      sql"INSERT INTO successors (ngram_id, successor, count) VALUES ($ngramId, ${successor.serialize}, $count)".update.run
-    }.toList.sequence
+      sql"INSERT INTO successors (ngram, successor, count) VALUES (${ngram.serialize}, ${successor.serialize}, $count)".update.run
+    }.toList
   }
 }
 
@@ -111,10 +100,9 @@ class FileSchema[S : StringSerializable] private(filePath: Path, transactor: Tra
   override def successorsOf(tokens: Vector[S]): IO[Option[HashMap[S, Int]]] = {
     val query =
       sql"""
-        SELECT s.successor, s.count
-        FROM successors s
-        JOIN ngrams n ON n.id = s.ngram_id
-        WHERE n.ngram = ${tokens.serialize}
+        SELECT successor, count
+        FROM successors
+        WHERE ngram = ${tokens.serialize}
       """.query[(String, Int)]
 
     val mappings = query.stream.map { case (successorString, count) =>
@@ -169,7 +157,7 @@ class FileSchema[S : StringSerializable] private(filePath: Path, transactor: Tra
     val query =
       sql"""
         SELECT MAX(LENGTH(ngram) - LENGTH((REPLACE(ngram, CHAR(10), ''))))
-        FROM ngrams
+        FROM successors
       """.query[Int].unique
 
     query.transact(transactor)
@@ -183,9 +171,8 @@ class FileSchema[S : StringSerializable] private(filePath: Path, transactor: Tra
   private def weights: IO[HashMap[Vector[S], HashMap[S, Int]]] = {
     val query =
       sql"""
-        SELECT n.ngram, s.successor, s.count
-        FROM ngrams n
-        JOIN successors s ON n.id = s.ngram_id
+        SELECT ngram, successor, count
+        FROM successors
       """.query[(String, String, Int)]
 
     val mappings = query.stream.map { case (ngramString, successorString, count) =>
