@@ -63,25 +63,22 @@ object FileSchema {
   }
 
   private def addSeeds[S : StringSerializable](transactor: Transactor[IO], seeds: Seq[S]): IO[List[Int]] = {
-    val inserts = seeds.map(seed =>
+    val queries = seeds.map(seed =>
       sql"INSERT INTO seeds (seed) VALUES (${seed.serialize})".update.run
     )
 
-    inserts.toList.sequence.transact(transactor)
+    queries.toList.sequence.transact(transactor)
   }
 
   private def addWeights[S : StringSerializable](transactor: Transactor[IO], weights: HashMap[Vector[S], HashMap[S, Int]]): IO[List[Int]] = {
-    val inserts = weights.flatMap {
-      case (ngram, successors) => successorInserts(ngram, successors)
+    val queries = weights.flatMap {
+      case (ngram, successors) => successors.map {
+        case (successor, count) =>
+          sql"INSERT INTO successors (ngram, successor, count) VALUES (${ngram.serialize}, ${successor.serialize}, $count)".update.run
+      }
     }
 
-    inserts.toList.sequence.transact(transactor)
-  }
-
-  private def successorInserts[S : StringSerializable](ngram: Vector[S], successors: HashMap[S, Int]): List[ConnectionIO[Int]] = {
-    successors.map { case (successor, count) =>
-      sql"INSERT INTO successors (ngram, successor, count) VALUES (${ngram.serialize}, ${successor.serialize}, $count)".update.run
-    }.toList
+    queries.toList.sequence.transact(transactor)
   }
 }
 
