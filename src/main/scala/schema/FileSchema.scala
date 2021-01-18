@@ -2,9 +2,9 @@ package schema
 
 import cats.effect.{ContextShift, IO}
 import cats.implicits._
+import doobie.ConnectionIO
 import doobie.implicits._
 import doobie.util.transactor.Transactor
-import doobie.util.transactor.Transactor.Aux
 import schema.serialization.StringDeserializable.syntax._
 import schema.serialization.StringSerializable
 import schema.serialization.StringSerializable.syntax._
@@ -18,17 +18,11 @@ object FileSchema {
   implicit val cs: ContextShift[IO] = IO.contextShift(ExecutionContext.global)
 
   def apply[S : StringSerializable](filePath: Path): FileSchema[S] = {
-    val transactor = Transactor.fromDriverManager[IO](
-      "org.sqlite.JDBC", s"jdbc:sqlite:${filePath.toAbsolutePath.toString}"
-    )
-
-    new FileSchema[S](filePath, transactor)
+    new FileSchema[S](filePath, getTransactor(filePath))
   }
 
   def apply[S : StringSerializable](filePath: Path, dictSchema: DictSchema[S]): IO[FileSchema[S]] = {
-    val transactor = Transactor.fromDriverManager[IO](
-      "org.sqlite.JDBC", s"jdbc:sqlite:${filePath.toAbsolutePath.toString}"
-    )
+    val transactor = getTransactor(filePath)
 
     for {
       _ <- createTables(transactor)
@@ -38,7 +32,13 @@ object FileSchema {
     } yield schema
   }
 
-  private def createTables(transactor: Aux[IO, Unit]): IO[List[Int]] = {
+  private def getTransactor(filePath: Path): Transactor[IO] = {
+    Transactor.fromDriverManager[IO](
+      "org.sqlite.JDBC", s"jdbc:sqlite:${filePath.toAbsolutePath.toString}"
+    )
+  }
+
+  private def createTables(transactor: Transactor[IO]): IO[List[Int]] = {
     val queries = List(
       sql"DROP TABLE IF EXISTS seeds",
       sql"DROP TABLE IF EXISTS ngrams",
@@ -69,7 +69,7 @@ object FileSchema {
     queries.traverse(_.update.run).transact(transactor)
   }
 
-  private def addSeeds[S : StringSerializable](transactor: Aux[IO, Unit], seeds: Seq[S]): IO[List[Int]] = {
+  private def addSeeds[S : StringSerializable](transactor: Transactor[IO], seeds: Seq[S]): IO[List[Int]] = {
     val inserts = seeds.map(seed =>
       sql"INSERT INTO seeds (seed) VALUES (${seed.serialize})".update.run
     )
@@ -77,7 +77,7 @@ object FileSchema {
     inserts.toList.sequence.transact(transactor)
   }
 
-  private def addWeights[S : StringSerializable](transactor: Aux[IO, Unit], weights: HashMap[Vector[S], HashMap[S, Int]]): IO[List[Long]] = {
+  private def addWeights[S : StringSerializable](transactor: Transactor[IO], weights: HashMap[Vector[S], HashMap[S, Int]]): IO[List[Long]] = {
     val inserts = weights.map { case (ngram, successors) =>
       for {
         _ <- sql"INSERT INTO ngrams (ngram) VALUES (${ngram.serialize})".update.run
@@ -89,14 +89,14 @@ object FileSchema {
     inserts.toList.sequence.transact(transactor)
   }
 
-  private def successorInserts[S : StringSerializable](ngramId: Long, successors: HashMap[S, Int]): doobie.ConnectionIO[List[Int]] = {
+  private def successorInserts[S : StringSerializable](ngramId: Long, successors: HashMap[S, Int]): ConnectionIO[List[Int]] = {
     successors.map { case (successor, count) =>
       sql"INSERT INTO successors (ngram_id, successor, count) VALUES ($ngramId, ${successor.serialize}, $count)".update.run
     }.toList.sequence
   }
 }
 
-class FileSchema[S : StringSerializable] private(filePath: Path, transactor: Aux[IO, Unit]) extends Schema[S] {
+class FileSchema[S : StringSerializable] private(filePath: Path, transactor: Transactor[IO]) extends Schema[S] {
   override def +(other: Schema[S]): IO[Schema[S]] = {
     // TODO do this better
     val schema = for {
