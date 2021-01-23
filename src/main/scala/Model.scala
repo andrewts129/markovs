@@ -12,7 +12,7 @@ object Model {
   def memory(corpus: Stream[IO, String], n: Int): Stream[IO, Model[PosToken, DictSchema]] = {
     val processed = corpus.map(document => PreProcessing.all(document, 2, n + 2))
     val schema = DictSchema(processed)
-    schema.map(new Model[PosToken, DictSchema](_, 2))
+    schema.map(new Model[PosToken, DictSchema](_, n))
   }
 
   def persistent(filePath: Path, corpus: Stream[IO, String], n: Int): Stream[IO, Model[PosToken, FileSchema]] = {
