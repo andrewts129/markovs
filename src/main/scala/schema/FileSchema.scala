@@ -99,14 +99,13 @@ object FileSchema {
 
 class FileSchema[S : StringSerializable] private(filePath: Path, transactor: Transactor[IO]) extends Schema[S] {
   override def +(other: Schema[S]): IO[Schema[S]] = {
-    // TODO do this better
-    val schema = for {
-      thisAsDict <- this.toDictSchema
-      thatAsDict <- other.toDictSchema
-      combinedSchema <- thisAsDict + thatAsDict
-    } yield combinedSchema
-
-    schema.flatMap(_.toFileSchema(filePath))
+    other.toDictSchema.flatMap {
+      otherAsDict => {
+        val seedUpdate = FileSchema.addSeeds(transactor, otherAsDict.seeds)
+        val weightUpdate = FileSchema.updateWeights(transactor, otherAsDict.weights)
+        (seedUpdate, weightUpdate).mapN((_, _) => this)
+      }
+    }
   }
 
   override def successorsOf(tokens: Vector[S]): IO[Option[HashMap[S, Int]]] = {
