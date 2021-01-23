@@ -27,7 +27,7 @@ object FileSchema {
     for {
       _ <- createTables(transactor)
       _ <- addSeeds(transactor, dictSchema.seeds)
-      _ <- addWeights(transactor, dictSchema.weights)
+      _ <- insertWeights(transactor, dictSchema.weights)
       schema <- IO { new FileSchema[S](filePath, transactor) }
     } yield schema
   }
@@ -53,7 +53,8 @@ object FileSchema {
           id        INTEGER PRIMARY KEY,
           ngram     TEXT NOT NULL,
           successor TEXT NOT NULL,
-          count     INTEGER NOT NULL
+          count     INTEGER NOT NULL,
+          UNIQUE(ngram, successor)
         )
       """,
       sql"CREATE INDEX ngram_index ON successors (ngram)"
@@ -70,11 +71,25 @@ object FileSchema {
     queries.toList.sequence.transact(transactor)
   }
 
-  private def addWeights[S : StringSerializable](transactor: Transactor[IO], weights: HashMap[Vector[S], HashMap[S, Int]]): IO[List[Int]] = {
+  private def insertWeights[S : StringSerializable](transactor: Transactor[IO], weights: HashMap[Vector[S], HashMap[S, Int]]): IO[List[Int]] = {
     val queries = weights.flatMap {
       case (ngram, successors) => successors.map {
         case (successor, count) =>
           sql"INSERT INTO successors (ngram, successor, count) VALUES (${ngram.serialize}, ${successor.serialize}, $count)".update.run
+      }
+    }
+
+    queries.toList.sequence.transact(transactor)
+  }
+
+  private def updateWeights[S : StringSerializable](transactor: Transactor[IO], weights: HashMap[Vector[S], HashMap[S, Int]]): IO[List[Int]] = {
+    val queries = weights.flatMap {
+      case (ngram, successors) => successors.map {
+        case (successor, count) =>
+          sql"""
+            INSERT INTO successors (ngram, successor, count) VALUES (${ngram.serialize}, ${successor.serialize}, $count)
+            ON CONFLICT(ngram, successor) DO UPDATE SET count = count + $count;
+          """.update.run
       }
     }
 
