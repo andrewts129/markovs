@@ -9,16 +9,16 @@ trait StringSerializable[A] {
 
 object StringSerializable {
   implicit val stringIsSerializable: StringSerializable[String] = {
-    (str: String) => str.replaceAll("[\n\t]", " ")
+    (str: String) => str.replace('\n', ' ').replace('\t', ' ')
   }
 
   implicit val posTokenIsSerializable: StringSerializable[PosToken] = {
     (posToken: PosToken) => posToken.token.serialize + "\t" + posToken.pos.serialize
   }
 
-  implicit def vectorIsSerializable[T : StringSerializable]: StringSerializable[Vector[T]] = {
+  implicit def vectorIsSerializable[S : StringSerializable]: StringSerializable[Vector[S]] = {
     // Add a trailing newline to differentiate vectors of size one from lone S objects
-    (vector: Vector[T]) => vector.map(_.serialize).mkString("\n") ++ "\n"
+    (vector: Vector[S]) => vector.map(_.serialize).mkString("\n") ++ "\n"
   }
 
   object syntax {
