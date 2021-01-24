@@ -1,6 +1,6 @@
 name := "markovs"
 organization := "io.andrewsmith"
-version := "0.1"
+version := "0.1-SNAPSHOT"
 
 scalaVersion := "2.13.3"
 
