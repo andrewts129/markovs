@@ -2,9 +2,9 @@ package schema
 
 import cats.effect.{ContextShift, IO}
 import cats.implicits._
-import doobie.ConnectionIO
 import doobie.implicits._
 import doobie.util.transactor.Transactor
+import fs2.{Pure, Stream}
 import schema.serialization.StringDeserializable.syntax._
 import schema.serialization.StringSerializable
 import schema.serialization.StringSerializable.syntax._
@@ -21,6 +21,11 @@ object FileSchema {
     new FileSchema[S](filePath, getTransactor(filePath))
   }
 
+  def apply[S : StringSerializable](filePath: Path, corpus: Stream[IO, Stream[Pure, Vector[S]]]): Stream[IO, FileSchema[S]] = {
+    val dictSchemas = corpus.chunkN(1000).map(Stream.chunk).flatMap(DictSchema(_))
+    fromDictSchemas(filePath, dictSchemas)
+  }
+
   def apply[S : StringSerializable](filePath: Path, dictSchema: DictSchema[S]): IO[FileSchema[S]] = {
     val transactor = getTransactor(filePath)
 
@@ -30,6 +35,18 @@ object FileSchema {
       _ <- insertWeights(transactor, dictSchema.weights)
       schema <- IO { new FileSchema[S](filePath, transactor) }
     } yield schema
+  }
+
+  private def fromDictSchemas[S : StringSerializable](filePath: Path, dictSchemas: Stream[IO, DictSchema[S]]): Stream[IO, FileSchema[S]] = {
+    val headAsFileSchema = dictSchemas.head.evalMap(_.toFileSchema(filePath))
+
+    // Honestly I'm shocked this works
+    headAsFileSchema.evalMap(
+      fileSchema => dictSchemas.drop(1).evalMap(fileSchema + _).compile.toList.map(_.lastOption match {
+        case Some(fileSchemaWithAdditions) => fileSchemaWithAdditions
+        case None => fileSchema // When the chunkN size is greater than the corpus size, dictSchemas.drop(1) is empty, so we need to get a return value elsewhere
+      })
+    )
   }
 
   private def getTransactor(filePath: Path): Transactor[IO] = {
@@ -98,7 +115,7 @@ object FileSchema {
 }
 
 class FileSchema[S : StringSerializable] private(filePath: Path, transactor: Transactor[IO]) extends Schema[S] {
-  override def +(other: Schema[S]): IO[Schema[S]] = {
+  override def +(other: Schema[S]): IO[FileSchema[S]] = {
     other.toDictSchema.flatMap {
       otherAsDict => {
         val seedUpdate = FileSchema.addSeeds(transactor, otherAsDict.seeds)

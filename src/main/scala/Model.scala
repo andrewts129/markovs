@@ -16,12 +16,9 @@ object Model {
   }
 
   def persistent(filePath: Path, corpus: Stream[IO, String], n: Int): Stream[IO, Model[PosToken, FileSchema]] = {
-    memory(corpus, n).evalMap(
-      memoryModel => {
-        val fileSchema = memoryModel.schema.toFileSchema(filePath)
-        fileSchema.map(new Model[PosToken, FileSchema](_, n))
-      }
-    )
+    val processed = corpus.map(document => PreProcessing.all(document, 2, n + 2))
+    val schema = FileSchema(filePath, processed)
+    schema.map(new Model[PosToken, FileSchema](_, n))
   }
 
   def load(filePath: Path): Stream[IO, Model[PosToken, FileSchema]] = {
