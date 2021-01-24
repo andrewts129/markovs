@@ -2,6 +2,7 @@ package schema
 
 import cats.effect.{ContextShift, IO}
 import cats.implicits._
+import doobie.FC
 import doobie.implicits._
 import doobie.util.transactor.Transactor
 import fs2.{Pure, Stream}
@@ -23,7 +24,7 @@ object FileSchema {
 
   def apply[S : StringSerializable](filePath: Path, corpus: Stream[IO, Stream[Pure, Vector[S]]]): Stream[IO, FileSchema[S]] = {
     val dictSchemas = corpus.chunkN(1000).map(Stream.chunk).flatMap(DictSchema(_))
-    fromDictSchemas(filePath, dictSchemas)
+    fromDictSchemas(filePath, dictSchemas).evalMap(_.compact)
   }
 
   def apply[S : StringSerializable](filePath: Path, dictSchema: DictSchema[S]): IO[FileSchema[S]] = {
@@ -34,7 +35,8 @@ object FileSchema {
       _ <- addSeeds(transactor, dictSchema.seeds)
       _ <- insertWeights(transactor, dictSchema.weights)
       schema <- IO { new FileSchema[S](filePath, transactor) }
-    } yield schema
+      compactedSchema <- schema.compact
+    } yield compactedSchema
   }
 
   private def fromDictSchemas[S : StringSerializable](filePath: Path, dictSchemas: Stream[IO, DictSchema[S]]): Stream[IO, FileSchema[S]] = {
@@ -111,6 +113,10 @@ object FileSchema {
     }
 
     queries.toList.sequence.transact(transactor)
+  }
+
+  private def vacuumTables(transactor: Transactor[IO]): IO[Int] = {
+    (FC.setAutoCommit(true) *> sql"VACUUM".update.run <* FC.setAutoCommit(false)).transact(transactor)
   }
 }
 
@@ -217,5 +223,9 @@ class FileSchema[S : StringSerializable] private(filePath: Path, transactor: Tra
     })
 
     mappings.transact(transactor).compile.toList.map(_.head)
+  }
+
+  private def compact: IO[FileSchema[S]] = {
+    FileSchema.vacuumTables(transactor).map(_ => this)
   }
 }
