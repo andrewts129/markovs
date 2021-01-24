@@ -1,9 +1,9 @@
-package schema
+package markovs.schema
 
 import cats.effect.{ContextShift, IO}
 import fs2.{Pure, Stream}
-import schema.DictSchema.Weights
-import schema.serialization.StringSerializable
+import markovs.schema.DictSchema.Weights
+import markovs.schema.serialization.StringSerializable
 
 import java.nio.file.Path
 import scala.collection.immutable.HashMap

@@ -1,4 +1,4 @@
-package schema
+package markovs.schema
 
 import cats.effect.IO
 

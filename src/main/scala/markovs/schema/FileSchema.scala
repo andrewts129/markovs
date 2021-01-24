@@ -1,4 +1,4 @@
-package schema
+package markovs.schema
 
 import cats.effect.{ContextShift, IO}
 import cats.implicits._
@@ -6,9 +6,9 @@ import doobie.FC
 import doobie.implicits._
 import doobie.util.transactor.Transactor
 import fs2.{Pure, Stream}
-import schema.serialization.StringDeserializable.syntax._
-import schema.serialization.StringSerializable
-import schema.serialization.StringSerializable.syntax._
+import markovs.schema.serialization.StringDeserializable.syntax._
+import markovs.schema.serialization.StringSerializable
+import markovs.schema.serialization.StringSerializable.syntax._
 
 import java.nio.file.{Files, Path}
 import scala.collection.immutable.HashMap

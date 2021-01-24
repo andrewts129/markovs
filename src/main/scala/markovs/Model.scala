@@ -1,10 +1,12 @@
-import Model.selectRandomWeighted
+package markovs
+
 import cats.effect.IO
 import fs2.Stream
-import processing.PostProcessing.detokenize
-import processing.PreProcessing
-import processing.PreProcessing.PosToken
-import schema.{DictSchema, FileSchema, Schema}
+import markovs.Model.selectRandomWeighted
+import markovs.processing.PostProcessing.detokenize
+import markovs.processing.PreProcessing
+import markovs.processing.PreProcessing.PosToken
+import markovs.schema.{DictSchema, FileSchema, Schema}
 
 import java.nio.file.Path
 import scala.util.Random

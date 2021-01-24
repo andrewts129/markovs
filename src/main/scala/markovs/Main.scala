@@ -1,10 +1,11 @@
+package markovs
+
+import cats.data.Validated
 import cats.effect.{Blocker, ExitCode, IO}
-import com.monovore.decline._
+import cats.implicits.{catsSyntaxTuple2Semigroupal, catsSyntaxTuple4Semigroupal}
+import com.monovore.decline.Opts
 import com.monovore.decline.effect.CommandIOApp
 import fs2.{Stream, io, text}
-import processing.PostProcessing.detokenize
-import cats.implicits._
-import cats.data.Validated
 
 import java.nio.file.Path
 

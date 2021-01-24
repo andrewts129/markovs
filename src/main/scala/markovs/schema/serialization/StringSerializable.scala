@@ -1,7 +1,7 @@
-package schema.serialization
+package markovs.schema.serialization
 
-import processing.PreProcessing.PosToken
-import schema.serialization.StringSerializable.syntax._
+import markovs.processing.PreProcessing.PosToken
+import markovs.schema.serialization.StringSerializable.syntax._
 
 trait StringSerializable[A] {
   def serialize(a: A): String

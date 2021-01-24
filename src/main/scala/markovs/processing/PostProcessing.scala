@@ -1,11 +1,11 @@
-package processing
+package markovs.processing
 
 import cats.effect.IO
 import cats.implicits._
 import fs2.{Chunk, Stream}
 import opennlp.tools.tokenize.DetokenizationDictionary.Operation
 import opennlp.tools.tokenize.{DetokenizationDictionary, DictionaryDetokenizer}
-import processing.PreProcessing.PosToken
+import markovs.processing.PreProcessing.PosToken
 
 object PostProcessing {
   private val NO_SPACE_BEFORE = Array(".", ",", "!", "?", ";", ":", "%", ")", "]", "}", "”")
