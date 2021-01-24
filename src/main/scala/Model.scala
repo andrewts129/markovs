@@ -1,6 +1,7 @@
 import Model.selectRandomWeighted
 import cats.effect.IO
 import fs2.Stream
+import processing.PostProcessing.detokenize
 import processing.PreProcessing
 import processing.PreProcessing.PosToken
 import schema.{DictSchema, FileSchema, Schema}
@@ -26,6 +27,14 @@ object Model {
     Stream.eval(schema.n).map(
       n => new Model(schema, n)
     )
+  }
+
+  def generateText[T[_] <: Schema[_]](model: Model[PosToken, T]): Stream[IO, String] = {
+    model.generate.through(detokenize)
+  }
+
+  def generateWords[T[_] <: Schema[_]](model: Model[PosToken, T]): Stream[IO, String] = {
+    generateText(model).flatMap(sentence => Stream.emits(sentence.split(' ')))
   }
 
   private def selectRandomWeighted[S](itemsWeighted: Map[S, Int], random: Random): S = {

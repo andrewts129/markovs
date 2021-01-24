@@ -49,8 +49,8 @@ object Main extends CommandIOApp(
         }
 
         if (shouldGenerate) {
-          val generatedTokens = model.flatMap(_.generate)
-          generatedTokens.through(detokenize).intersperse(" ").map(print(_)).compile.drain.as(ExitCode.Success)
+          val generatedTokens = model.flatMap(Model.generateText)
+          generatedTokens.intersperse(" ").map(print(_)).compile.drain.as(ExitCode.Success)
         } else {
           model.compile.drain.as(ExitCode.Success)
         }
