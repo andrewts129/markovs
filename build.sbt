@@ -1,3 +1,7 @@
+import java.nio.file.Files
+import java.nio.file.Path
+import sys.process._
+
 name := "markovs"
 organization := "io.andrewsmith"
 version := "0.1-SNAPSHOT"
@@ -13,3 +17,13 @@ libraryDependencies ++= Seq(
   "com.monovore" %% "decline" % "1.3.0",
   "com.monovore" %% "decline-effect" % "1.3.0"
 )
+
+val downloadNlpModel = taskKey[Unit]("Downloads the OpenNLP model used for POS tagging")
+downloadNlpModel := {
+  val path = Path.of("src", "main", "resources", "en-pos-maxent.bin")
+  if (!Files.exists(path)) {
+    (url("http://opennlp.sourceforge.net/models-1.5/en-pos-maxent.bin") #> path.toFile).!!
+  }
+}
+
+(Compile / compile) := ((Compile / compile) dependsOn downloadNlpModel).value

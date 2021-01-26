@@ -10,7 +10,7 @@ object PreProcessing {
   }
 
   private lazy val tokenizer = SimpleTokenizer.INSTANCE
-  private lazy val taggerModel = new POSModel(getClass.getResourceAsStream("/en-pos-maxent.bin"))  // TODO download this
+  private lazy val taggerModel = new POSModel(getClass.getResourceAsStream("/en-pos-maxent.bin"))
   private lazy val tagger = new POSTaggerME(taggerModel)
 
   def all(string: String, ngramSize: Int): Stream[Pure, Vector[PosToken]] = {
