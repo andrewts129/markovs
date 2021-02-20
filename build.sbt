@@ -5,8 +5,6 @@ import sys.process._
 name := "markovs"
 organization := "io.andrewsmith"
 version := "0.1-SNAPSHOT"
-githubOwner := "andrewts129"
-githubRepository := "markovs"
 
 scalaVersion := "2.13.3"
 

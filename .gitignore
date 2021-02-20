@@ -4,4 +4,3 @@
 data/
 *.bin
 *.schema
-.env
