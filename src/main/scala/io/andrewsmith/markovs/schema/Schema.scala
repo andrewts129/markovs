@@ -1,4 +1,4 @@
-package markovs.schema
+package io.andrewsmith.markovs.schema
 
 import cats.effect.IO
 

@@ -1,4 +1,4 @@
-package markovs
+package io.andrewsmith.markovs
 
 import cats.data.Validated
 import cats.effect.{Blocker, ExitCode, IO}

@@ -1,7 +1,7 @@
-package markovs.schema.serialization
+package io.andrewsmith.markovs.schema.serialization
 
-import markovs.processing.PreProcessing.PosToken
-import markovs.schema.serialization.StringSerializable.syntax._
+import io.andrewsmith.markovs.processing.PreProcessing.PosToken
+import io.andrewsmith.markovs.schema.serialization.StringSerializable.syntax._
 
 trait StringSerializable[A] {
   def serialize(a: A): String

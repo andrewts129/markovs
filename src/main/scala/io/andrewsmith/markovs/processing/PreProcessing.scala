@@ -1,4 +1,4 @@
-package markovs.processing
+package io.andrewsmith.markovs.processing
 
 import fs2.{Pure, Stream}
 import opennlp.tools.postag.{POSModel, POSTaggerME}

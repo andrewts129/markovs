@@ -1,12 +1,12 @@
-package markovs
+package io.andrewsmith.markovs
 
 import cats.effect.IO
 import fs2.Stream
-import markovs.Model.selectRandomWeighted
-import markovs.processing.PostProcessing.detokenize
-import markovs.processing.PreProcessing
-import markovs.processing.PreProcessing.PosToken
-import markovs.schema.{DictSchema, FileSchema, Schema}
+import io.andrewsmith.markovs.Model.selectRandomWeighted
+import io.andrewsmith.markovs.processing.PostProcessing.detokenize
+import io.andrewsmith.markovs.processing.PreProcessing
+import io.andrewsmith.markovs.processing.PreProcessing.PosToken
+import io.andrewsmith.markovs.schema.{DictSchema, FileSchema, Schema}
 
 import java.nio.file.Path
 import scala.util.Random
