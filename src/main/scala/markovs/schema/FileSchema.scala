@@ -24,7 +24,7 @@ object FileSchema {
 
   def apply[S : StringSerializable](filePath: Path, corpus: Stream[IO, Stream[Pure, Vector[S]]]): Stream[IO, FileSchema[S]] = {
     val dictSchemas = corpus.chunkN(1000).map(Stream.chunk).flatMap(DictSchema(_))
-    fromDictSchemas(filePath, dictSchemas).evalMap(_.compact)
+    fromDictSchemas(filePath, dictSchemas).evalMap(_.prune).evalMap(_.compact)
   }
 
   def apply[S : StringSerializable](filePath: Path, dictSchema: DictSchema[S]): IO[FileSchema[S]] = {
@@ -35,7 +35,8 @@ object FileSchema {
       _ <- addSeeds(transactor, dictSchema.seeds)
       _ <- insertWeights(transactor, dictSchema.weights)
       schema <- IO { new FileSchema[S](filePath, transactor) }
-      compactedSchema <- schema.compact
+      prunedSchema <- schema.prune
+      compactedSchema <- prunedSchema.compact
     } yield compactedSchema
   }
 
@@ -113,6 +114,27 @@ object FileSchema {
     }
 
     queries.toList.sequence.transact(transactor)
+  }
+
+  private def pruneSuccessors(transactor: Transactor[IO]): IO[Int] = {
+    // Removes all the successors that don't lead to multiple paths and only appeared once in the corpus, unless
+    // they're using a small n predecessor. This is done to avoid "railroading" i.e. just straight up copying the source text
+    val query =
+      sql"""
+        DELETE
+        FROM successors
+        WHERE count <= 1
+          AND LENGTH(ngram) - LENGTH((REPLACE(ngram, CHAR(10), ''))) > 3
+          AND ROWID NOT IN (
+            SELECT ROWID
+            FROM successors s2
+            WHERE s2.count <= 1
+            GROUP BY s2.ngram
+            HAVING COUNT(s2.ngram) > 1
+          )
+      """.update.run
+
+    query.transact(transactor)
   }
 
   private def vacuumTables(transactor: Transactor[IO]): IO[Int] = {
@@ -223,6 +245,10 @@ class FileSchema[S : StringSerializable] private(filePath: Path, transactor: Tra
     })
 
     mappings.transact(transactor).compile.toList.map(_.head)
+  }
+
+  private def prune: IO[FileSchema[S]] = {
+    FileSchema.pruneSuccessors(transactor).map(_ => this)
   }
 
   private def compact: IO[FileSchema[S]] = {
