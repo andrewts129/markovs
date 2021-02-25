@@ -93,7 +93,8 @@ class Model[S, T[_] <: Schema[_]] private(val schema: Schema[S], val n: Int, val
     Stream.eval(next(tokens)).flatMap {
       case Some(nextToken) =>
         val nextTokenAsStream = Stream.emit(nextToken)
-        nextTokenAsStream ++ nextStreaming(tokens ++ nextTokenAsStream)
+        val newSeed = (tokens ++ nextTokenAsStream).takeRight(n)
+        nextTokenAsStream ++ nextStreaming(newSeed)
       case None => Stream.empty
     }
   }
