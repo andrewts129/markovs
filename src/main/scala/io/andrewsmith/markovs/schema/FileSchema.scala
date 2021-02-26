@@ -9,6 +9,7 @@ import fs2.{Pure, Stream}
 import io.andrewsmith.markovs.schema.serialization.StringDeserializable.syntax._
 import io.andrewsmith.markovs.schema.serialization.StringSerializable
 import io.andrewsmith.markovs.schema.serialization.StringSerializable.syntax._
+import org.sqlite.SQLiteConfig
 
 import java.nio.file.{Files, Path}
 import scala.collection.immutable.HashMap
@@ -53,8 +54,12 @@ object FileSchema {
   }
 
   private def getTransactor(filePath: Path): Transactor[IO] = {
+    val config = new SQLiteConfig()
+    config.setJournalMode(SQLiteConfig.JournalMode.MEMORY)
+    config.setSynchronous(SQLiteConfig.SynchronousMode.OFF)
+
     Transactor.fromDriverManager[IO](
-      "org.sqlite.JDBC", s"jdbc:sqlite:${filePath.toAbsolutePath.toString}"
+      "org.sqlite.JDBC", s"jdbc:sqlite:${filePath.toAbsolutePath.toString}", config.toProperties
     )
   }
 
